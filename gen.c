@@ -90,3 +90,68 @@ Seed gen_seed_from_hex(const char *hex) {
     seed_fill_hex(&s);
     return s;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   NOISE GENERATION
+═══════════════════════════════════════════════════════════ */
+
+static uint64_t seed_to_rng(const Seed *s) {
+    uint64_t r = s->parts[0]
+               ^ (s->parts[1] * UINT64_C(0xdeadbeefcafe1337))
+               ^ s->parts[2];
+    gen_lcg_next(&r);
+    gen_lcg_next(&r);
+    return r;
+}
+
+static float *gen_heightmap(int W, int H, uint64_t *rng) {
+    float *hmap = malloc(W * H * sizeof(float));
+    if (!hmap) { perror("malloc"); exit(1); }
+
+    float noise_table[256];
+    for (int i = 0; i < 256; i++)
+        noise_table[i] = (float)(gen_lcg_next(rng) & 0xFFFF) / 65535.0f;
+
+    for (int y = 0; y < H; y++) {
+        for (int x = 0; x < W; x++) {
+            float v = 0.0f;
+            float amp = 1.0f, freq = 1.0f, total_amp = 0.0f;
+            for (int o = 0; o < 4; o++) {
+                int ix  = (int)(x * freq) & 255;
+                int iy  = (int)(y * freq) & 255;
+                int idx = (ix * 31 + iy * 17 + o * 97) & 255;
+                v         += noise_table[idx] * amp;
+                total_amp += amp;
+                amp  *= 0.5f;
+                freq *= 2.0f;
+            }
+            hmap[y * W + x] = v / total_amp;
+        }
+    }
+    return hmap;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TILE ALLOCATION
+═══════════════════════════════════════════════════════════ */
+
+static Tile **alloc_tiles(int W, int H) {
+    Tile **tiles = malloc(H * sizeof(Tile *));
+    if (!tiles) { perror("malloc"); exit(1); }
+    for (int y = 0; y < H; y++) {
+        tiles[y] = malloc(W * sizeof(Tile));
+        if (!tiles[y]) { perror("malloc"); exit(1); }
+        for (int x = 0; x < W; x++) {
+            tiles[y][x].terrain = TERRAIN_PLAIN;
+            tiles[y][x].city_id = -1;
+            tiles[y][x].camp_id = -1;
+        }
+    }
+    return tiles;
+}
+
+static int chebyshev(int ax, int ay, int bx, int by) {
+    int dx = ax - bx; if (dx < 0) dx = -dx;
+    int dy = ay - by; if (dy < 0) dy = -dy;
+    return dx > dy ? dx : dy;
+}
