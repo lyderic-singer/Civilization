@@ -155,3 +155,94 @@ static int chebyshev(int ax, int ay, int bx, int by) {
     int dy = ay - by; if (dy < 0) dy = -dy;
     return dx > dy ? dx : dy;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   MAP GENERATION MAIN
+═══════════════════════════════════════════════════════════ */
+
+void gen_map(GameState *gs) {
+    int W = gs->map.width;
+    int H = gs->map.height;
+    uint64_t rng = seed_to_rng(&gs->seed);
+
+    gs->map.tiles = alloc_tiles(W, H);
+
+    /* ── 1. Height + moisture noise ─────────────────────── */
+    float *hmap = gen_heightmap(W, H, &rng);
+    float *mmap = gen_heightmap(W, H, &rng);
+
+    /* ── 2. Classify terrain ────────────────────────────── */
+    for (int y = 0; y < H; y++) {
+        for (int x = 0; x < W; x++) {
+            float h = hmap[y * W + x];
+            float m = mmap[y * W + x];
+            TerrainType t;
+            if (h < 0.28f) {
+                t = TERRAIN_WATER;
+            } else if (h < 0.40f) {
+                t = (m > 0.55f) ? TERRAIN_TUNDRA : TERRAIN_DESERT;
+            } else if (h < 0.60f) {
+                t = (m > 0.50f) ? TERRAIN_FOREST : TERRAIN_PLAIN;
+            } else if (h < 0.80f) {
+                t = (m > 0.45f) ? TERRAIN_FOREST : TERRAIN_PLAIN;
+            } else {
+                t = TERRAIN_MOUNTAIN;
+            }
+            gs->map.tiles[y][x].terrain = t;
+        }
+    }
+    free(hmap);
+    free(mmap);
+
+    /* ── 3. Pick starting plain tile (center-ish) ──────── */
+    int sx = W / 2, sy = H / 2;
+    for (int r = 0; r <= (W > H ? W : H); r++) {
+        int found = 0;
+        for (int dy = -r; dy <= r && !found; dy++) {
+            for (int dx = -r; dx <= r && !found; dx++) {
+                if ((dx != -r && dx != r) && (dy != -r && dy != r)) continue;
+                int nx = sx + dx, ny = sy + dy;
+                if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+                if (gs->map.tiles[ny][nx].terrain == TERRAIN_PLAIN) {
+                    sx = nx; sy = ny; found = 1;
+                }
+            }
+        }
+        if (found) break;
+        if (r == 0 && gs->map.tiles[sy][sx].terrain == TERRAIN_PLAIN) break;
+    }
+    gs->map.tiles[sy][sx].terrain = TERRAIN_PLAIN;
+
+    /* ── 4. Place starting city ─────────────────────────── */
+    gs->next_city_id = 0;
+    City *start_city = city_create(gs, sx, sy, 0);
+    (void)start_city;
+
+    /* ── 5. Place starting warrior ──────────────────────── */
+    gs->next_unit_id = 0;
+    unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, sx, sy);
+
+    /* ── 6. Place barbarian camps ────────────────────────── */
+    gs->next_camp_id = 0;
+    int placed = 0, attempts = 0;
+    while (placed < gs->n_barbarian_camps_initial && attempts < W * H * 4) {
+        attempts++;
+        int cx = gen_rand_range(&rng, 0, W - 1);
+        int cy = gen_rand_range(&rng, 0, H - 1);
+        if (gs->map.tiles[cy][cx].terrain == TERRAIN_WATER) continue;
+        if (chebyshev(cx, cy, sx, sy) < BARB_MIN_DIST_FROM_START) continue;
+        if (gs->map.tiles[cy][cx].camp_id != -1) continue;
+        if (gs->map.tiles[cy][cx].city_id != -1) continue;
+
+        Camp *c = malloc(sizeof(Camp));
+        if (!c) { perror("malloc"); exit(1); }
+        c->id    = gs->next_camp_id++;
+        c->x     = cx;
+        c->y     = cy;
+        c->alive = 1;
+        c->next  = gs->camps;
+        gs->camps = c;
+        gs->map.tiles[cy][cx].camp_id = c->id;
+        placed++;
+    }
+}
