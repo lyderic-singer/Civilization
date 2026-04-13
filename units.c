@@ -170,3 +170,64 @@ void units_apply_pm_bonus(GameState *gs) {
         }
     }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   COMBAT
+═══════════════════════════════════════════════════════════ */
+
+int unit_attack_unit(GameState *gs, Unit *attacker, Unit *defender) {
+    int dmg_to_def = attacker->attack - defender->defense;
+    if (dmg_to_def < 1) dmg_to_def = 1;
+
+    int dmg_to_atk = defender->attack - attacker->defense;
+    if (dmg_to_atk < 0) dmg_to_atk = 0;
+
+    defender->hp -= dmg_to_def;
+    attacker->hp -= dmg_to_atk;
+
+    printf("[Combat] %s(%d) vs %s(%d) → -%d/-%d PV\n",
+           unit_type_name(attacker->type), attacker->id,
+           unit_type_name(defender->type), defender->id,
+           dmg_to_def, dmg_to_atk);
+
+    int def_dead = 0;
+    if (defender->hp <= 0) {
+        printf("[Unite detruite] %s id=%d\n", unit_type_name(defender->type), defender->id);
+        unit_destroy(gs, defender->id);
+        def_dead = 1;
+    }
+    if (attacker->hp <= 0) {
+        printf("[Unite detruite] %s id=%d\n", unit_type_name(attacker->type), attacker->id);
+        unit_destroy(gs, attacker->id);
+    }
+    return def_dead;
+}
+
+int unit_attack_city(GameState *gs, Unit *attacker, City *city) {
+    int has_wall  = (city->buildings & BUILDING_WALL) ? 1 : 0;
+    int city_def  = has_wall ? CITY_DEFENSE_WALL : CITY_DEFENSE_BASE;
+    int city_atk  = city_def;
+
+    int dmg_to_city = attacker->attack - city_def;
+    if (dmg_to_city < 1) dmg_to_city = 1;
+
+    int dmg_to_unit = city_atk - attacker->defense;
+    if (dmg_to_unit < 0) dmg_to_unit = 0;
+
+    city->hp -= dmg_to_city;
+    city->took_damage_this_turn = 1;
+    attacker->hp -= dmg_to_unit;
+
+    printf("[Siege] %s attaque ville id=%d → ville -%d PV, unite -%d PV\n",
+           unit_type_name(attacker->type), city->id, dmg_to_city, dmg_to_unit);
+
+    if (attacker->hp <= 0)
+        unit_destroy(gs, attacker->id);
+
+    if (city->hp <= 0) {
+        printf("[Ville rasee] id=%d\n", city->id);
+        city_raze(gs, city->id);
+        return 1;
+    }
+    return 0;
+}
