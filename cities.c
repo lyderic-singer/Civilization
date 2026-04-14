@@ -134,3 +134,82 @@ static int cheb(int ax, int ay, int bx, int by) {
     int dy = ay - by; if (dy < 0) dy = -dy;
     return dx > dy ? dx : dy;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   TERRAIN INFO  (local table mirror)
+═══════════════════════════════════════════════════════════ */
+
+static const int T_FOOD[TERRAIN_COUNT] = {
+    TERRAIN_PLAIN_FOOD, TERRAIN_FOREST_FOOD, TERRAIN_MOUNTAIN_FOOD,
+    TERRAIN_WATER_FOOD, TERRAIN_DESERT_FOOD, TERRAIN_TUNDRA_FOOD
+};
+static const int T_PROD[TERRAIN_COUNT] = {
+    TERRAIN_PLAIN_PROD, TERRAIN_FOREST_PROD, TERRAIN_MOUNTAIN_PROD,
+    TERRAIN_WATER_PROD, TERRAIN_DESERT_PROD, TERRAIN_TUNDRA_PROD
+};
+static const int T_GOLD[TERRAIN_COUNT] = {
+    TERRAIN_PLAIN_GOLD, TERRAIN_FOREST_GOLD, TERRAIN_MOUNTAIN_GOLD,
+    TERRAIN_WATER_GOLD, TERRAIN_DESERT_GOLD, TERRAIN_TUNDRA_GOLD
+};
+static const int T_SCI[TERRAIN_COUNT] = {
+    TERRAIN_PLAIN_SCI, TERRAIN_FOREST_SCI, TERRAIN_MOUNTAIN_SCI,
+    TERRAIN_WATER_SCI, TERRAIN_DESERT_SCI, TERRAIN_TUNDRA_SCI
+};
+
+/* ═══════════════════════════════════════════════════════════
+   YIELD COMPUTATION
+═══════════════════════════════════════════════════════════ */
+
+void cities_compute_yields(GameState *gs) {
+    int W = gs->map.width;
+    int H = gs->map.height;
+
+    for (City *c = gs->cities; c; c = c->next) {
+        c->yield_food = c->yield_prod = c->yield_gold = c->yield_science = 0;
+    }
+
+    for (int y = 0; y < H; y++) {
+        for (int x = 0; x < W; x++) {
+            City *owner = NULL;
+            int   best_dist = 999999;
+            int   best_turn = 999999;
+
+            for (City *c = gs->cities; c; c = c->next) {
+                int d = cheb(x, y, c->x, c->y);
+                int r = city_exploit_radius(c->population);
+                if (d > r) continue;
+                if (d < best_dist || (d == best_dist && c->founded_turn < best_turn)) {
+                    best_dist = d;
+                    best_turn = c->founded_turn;
+                    owner     = c;
+                }
+            }
+            if (!owner) continue;
+
+            TerrainType t = gs->map.tiles[y][x].terrain;
+            int food = T_FOOD[t];
+            int prod = T_PROD[t];
+            int gold = T_GOLD[t];
+            int sci  = T_SCI[t];
+
+            if (t == TERRAIN_FOREST) food += gs->bonus_forest_food;
+
+            owner->yield_food    += food;
+            owner->yield_prod    += prod;
+            owner->yield_gold    += gold;
+            owner->yield_science += sci;
+        }
+    }
+
+    for (City *c = gs->cities; c; c = c->next) {
+        if (c->buildings & BUILDING_GRANARY)  c->yield_food    += BUILDING_GRANARY_FOOD;
+        if (c->buildings & BUILDING_WORKSHOP) c->yield_prod    += BUILDING_WORKSHOP_PROD;
+        if (c->buildings & BUILDING_LIBRARY)  c->yield_science += BUILDING_LIBRARY_SCI;
+        if (c->buildings & BUILDING_MARKET)   c->yield_gold    += BUILDING_MARKET_GOLD;
+
+        c->yield_food    = c->yield_food    + c->yield_food    * gs->bonus_food_pct / 100;
+        c->yield_prod    = c->yield_prod    + c->yield_prod    * gs->bonus_prod_pct / 100;
+        c->yield_science = c->yield_science + c->yield_science * gs->bonus_sci_pct  / 100;
+        c->yield_gold    = c->yield_gold    + c->yield_gold    * gs->bonus_gold_pct / 100;
+    }
+}
