@@ -283,3 +283,70 @@ void cities_produce(GameState *gs) {
         city_cancel_project(c);
     }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   GROWTH PHASE
+═══════════════════════════════════════════════════════════ */
+
+void cities_grow(GameState *gs) {
+    City *next_city;
+    for (City *c = gs->cities; c; c = next_city) {
+        next_city = c->next;
+
+        int consumption = CITY_FOOD_CONSUMPTION_FACTOR * c->population;
+        int net_food    = c->yield_food - consumption;
+        c->food_stock  += net_food;
+
+        int threshold = CITY_GROWTH_BASE + CITY_GROWTH_PER_POP * c->population;
+        if (c->buildings & BUILDING_GRANARY)
+            threshold = (int)(threshold / BUILDING_GRANARY_GROWTH_DIV);
+
+        if (c->food_stock >= threshold) {
+            c->food_stock = 0;
+            c->population++;
+            city_recompute_hp(c);
+            printf("[Ville %d] Croissance! Population: %d\n", c->id, c->population);
+        } else if (c->food_stock < 0) {
+            c->food_stock = 0;
+            c->population--;
+            printf("[Ville %d] Famine! Population: %d\n", c->id, c->population);
+            if (c->population <= 0) {
+                printf("[Ville %d] Abandonnee (famine)\n", c->id);
+                city_raze(gs, c->id);
+            } else {
+                city_recompute_hp(c);
+            }
+        }
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HEAL PHASE
+═══════════════════════════════════════════════════════════ */
+
+void cities_heal(GameState *gs) {
+    for (City *c = gs->cities; c; c = c->next) {
+        if (!c->took_damage_this_turn && c->hp < c->hp_max) {
+            c->hp += c->hp_max / CITY_HEAL_DIVISOR;
+            if (c->hp > c->hp_max) c->hp = c->hp_max;
+        }
+    }
+}
+
+void cities_reset_damage_flag(GameState *gs) {
+    for (City *c = gs->cities; c; c = c->next)
+        c->took_damage_this_turn = 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GOLD MAINTENANCE
+═══════════════════════════════════════════════════════════ */
+
+int cities_total_building_maint(GameState *gs) {
+    int total = 0;
+    for (City *c = gs->cities; c; c = c->next)
+        for (int i = 0; i < BUILDING_COUNT; i++)
+            if (c->buildings & BUILDINGS[i].flag)
+                total += BUILDINGS[i].maint;
+    return total;
+}
