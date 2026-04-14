@@ -213,3 +213,73 @@ void cities_compute_yields(GameState *gs) {
         c->yield_gold    = c->yield_gold    + c->yield_gold    * gs->bonus_gold_pct / 100;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PROJECT HELPERS
+═══════════════════════════════════════════════════════════ */
+
+void city_set_project(City *c, int project_type, int project_id) {
+    c->project_type = project_type;
+    c->project_id   = project_id;
+    c->prod_stock   = 0;
+}
+
+void city_cancel_project(City *c) {
+    c->project_type = PROJECT_NONE;
+    c->project_id   = 0;
+}
+
+int city_project_cost(GameState *gs, City *c) {
+    (void)gs;
+    if (c->project_type == PROJECT_BUILDING)
+        return building_cost(c->project_id);
+    if (c->project_type == PROJECT_UNIT)
+        return unit_cost((UnitType)c->project_id);
+    return 0;
+}
+
+int city_can_build(GameState *gs, City *c, int building_flag) {
+    if (c->buildings & building_flag) return 0;
+    switch (building_flag) {
+        case BUILDING_GRANARY:  return 1;
+        case BUILDING_WORKSHOP: return 1;
+        case BUILDING_BARRACKS: return 1;
+        case BUILDING_LIBRARY:  return gs->library_unlocked;
+        case BUILDING_MARKET:   return gs->market_unlocked;
+        case BUILDING_WALL:     return gs->wall_unlocked;
+        default: return 0;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PRODUCTION PHASE
+═══════════════════════════════════════════════════════════ */
+
+void cities_produce(GameState *gs) {
+    for (City *c = gs->cities; c; c = c->next) {
+        if (c->project_type == PROJECT_NONE) continue;
+
+        c->prod_stock += c->yield_prod;
+        int needed = city_project_cost(gs, c);
+        if (c->prod_stock < needed) continue;
+
+        c->prod_stock = 0;
+
+        if (c->project_type == PROJECT_BUILDING) {
+            int flag = c->project_id;
+            c->buildings |= flag;
+            city_recompute_hp(c);
+            printf("[Ville %d] Construction complete: %s\n", c->id, building_name(flag));
+        } else if (c->project_type == PROJECT_UNIT) {
+            UnitType ut = (UnitType)c->project_id;
+            if (ut == UNIT_TYPE_WARRIOR && !(c->buildings & BUILDING_BARRACKS)) {
+                printf("[Ville %d] Caserne requise pour produire un Guerrier\n", c->id);
+                city_cancel_project(c);
+                continue;
+            }
+            Unit *u = unit_create(gs, ut, UNIT_OWNER_PLAYER, c->x, c->y);
+            printf("[Ville %d] Unite creee: %s id=%d\n", c->id, unit_type_name(ut), u->id);
+        }
+        city_cancel_project(c);
+    }
+}
