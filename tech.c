@@ -95,3 +95,104 @@ static const TechDef TECH_DEFS[TECH_COUNT] = {
         .bonus_pm = 1,
     },
 };
+
+/* ═══════════════════════════════════════════════════════════
+   PUBLIC API
+═══════════════════════════════════════════════════════════ */
+
+const TechDef *tech_def(int tech_id) {
+    if (tech_id < 0 || tech_id >= TECH_COUNT) return NULL;
+    return &TECH_DEFS[tech_id];
+}
+
+const char *tech_name(int tech_id) {
+    if (tech_id < 0 || tech_id >= TECH_COUNT) return "Inconnue";
+    return TECH_DEFS[tech_id].name;
+}
+
+void tech_init(TechState *ts) {
+    memset(ts->acquired, 0, sizeof ts->acquired);
+    ts->researching    = TECH_ID_NONE;
+    ts->science_stored = 0;
+}
+
+int tech_prereqs_met(const TechState *ts, int tech_id) {
+    if (tech_id < 0 || tech_id >= TECH_COUNT) return 0;
+    const TechDef *def = &TECH_DEFS[tech_id];
+    for (int i = 0; i < def->prereq_count; i++) {
+        int p = def->prereqs[i];
+        if (p == TECH_ID_NONE) continue;
+        if (!ts->acquired[p]) return 0;
+    }
+    return 1;
+}
+
+int tech_available(const TechState *ts, int tech_id) {
+    if (tech_id < 0 || tech_id >= TECH_COUNT) return 0;
+    if (ts->acquired[tech_id]) return 0;
+    return tech_prereqs_met(ts, tech_id);
+}
+
+void tech_set_research(TechState *ts, int tech_id) {
+    if (ts->researching != TECH_ID_NONE && ts->researching != tech_id) {
+        ts->science_stored /= 2;
+        printf("[Recherche] Changement vers %s, cagnotte reduite a %d\n",
+               tech_name(tech_id), ts->science_stored);
+    }
+    ts->researching = tech_id;
+}
+
+int tech_add_science(TechState *ts, int science) {
+    if (ts->researching == TECH_ID_NONE) return TECH_ID_NONE;
+    ts->science_stored += science;
+    const TechDef *def = &TECH_DEFS[ts->researching];
+    if (ts->science_stored >= def->cost) {
+        int completed = ts->researching;
+        ts->acquired[completed] = 1;
+        ts->researching         = TECH_ID_NONE;
+        ts->science_stored      = 0;
+        printf("[Recherche] Technologie acquise: %s\n", def->name);
+        return completed;
+    }
+    return TECH_ID_NONE;
+}
+
+int tech_all_acquired(const TechState *ts) {
+    for (int i = 0; i < TECH_COUNT; i++)
+        if (!ts->acquired[i]) return 0;
+    return 1;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EFFECT APPLICATION
+═══════════════════════════════════════════════════════════ */
+
+void tech_apply_effects(GameState *gs) {
+    gs->bonus_food_pct    = 0;
+    gs->bonus_prod_pct    = 0;
+    gs->bonus_sci_pct     = 0;
+    gs->bonus_gold_pct    = 0;
+    gs->extra_pm          = 0;
+    gs->bonus_forest_food = 0;
+    gs->warrior_unlocked  = 0;
+    gs->wall_unlocked     = 0;
+    gs->library_unlocked  = 0;
+    gs->market_unlocked   = 0;
+
+    for (int i = 0; i < TECH_COUNT; i++) {
+        if (!gs->tech.acquired[i]) continue;
+        const TechDef *d = &TECH_DEFS[i];
+        gs->bonus_food_pct    += d->bonus_food_pct + d->bonus_food2_pct;
+        gs->bonus_prod_pct    += d->bonus_prod_pct;
+        gs->bonus_sci_pct     += d->bonus_sci_pct;
+        gs->bonus_gold_pct    += d->bonus_gold_pct;
+        gs->extra_pm          += d->bonus_pm;
+        gs->bonus_forest_food += d->bonus_forest_food;
+        if (d->unlock_warrior) gs->warrior_unlocked = 1;
+        if (d->unlock_wall)    gs->wall_unlocked    = 1;
+        if (d->unlock_library) gs->library_unlocked = 1;
+        if (d->unlock_market)  gs->market_unlocked  = 1;
+    }
+
+    units_apply_pm_bonus(gs);
+}
