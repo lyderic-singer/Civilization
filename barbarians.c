@@ -53,3 +53,80 @@ static int find_nearest_target(GameState *gs, int bx, int by, int *tx, int *ty) 
     *ty = best_y;
     return 1;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   GREEDY MOVE TOWARD TARGET
+═══════════════════════════════════════════════════════════ */
+
+static const int TERRAIN_COSTS[TERRAIN_COUNT] = {
+    TERRAIN_PLAIN_COST,
+    TERRAIN_FOREST_COST,
+    TERRAIN_MOUNTAIN_COST,
+    TERRAIN_WATER_COST,
+    TERRAIN_DESERT_COST,
+    TERRAIN_TUNDRA_COST
+};
+
+static void barb_move_toward(GameState *gs, Unit *barb, int tx, int ty) {
+    int best_dx = 0, best_dy = 0;
+    int best_dist = chebyshev(barb->x, barb->y, tx, ty);
+    int best_cost = 999;
+
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            if (dx == 0 && dy == 0) continue;
+            int nx = barb->x + dx;
+            int ny = barb->y + dy;
+            if (nx < 0 || nx >= gs->map.width || ny < 0 || ny >= gs->map.height) continue;
+
+            TerrainType t = gs->map.tiles[ny][nx].terrain;
+            int cost = TERRAIN_COSTS[t];
+            if (cost == 0) continue;
+            if (cost > barb->pm_left) continue;
+
+            Unit *occ = unit_at(gs, nx, ny, UNIT_OWNER_BARB);
+            if (occ && occ->id != barb->id) continue;
+
+            int d = chebyshev(nx, ny, tx, ty);
+            if (d < best_dist ||
+                (d == best_dist && cost < best_cost) ||
+                (d == best_dist && cost == best_cost &&
+                 (dy < best_dy || (dy == best_dy && dx < best_dx)))) {
+                best_dist = d;
+                best_cost = cost;
+                best_dx   = dx;
+                best_dy   = dy;
+            }
+        }
+    }
+
+    if (best_dist == chebyshev(barb->x, barb->y, tx, ty) && best_dx == 0 && best_dy == 0)
+        return;
+    if (best_dx == 0 && best_dy == 0) return;
+
+    int nx = barb->x + best_dx;
+    int ny = barb->y + best_dy;
+
+    /* Check for player unit at destination → attack */
+    Unit *player_unit = unit_at(gs, nx, ny, UNIT_OWNER_PLAYER);
+    if (player_unit) {
+        printf("[Barbare %d] Attaque unite joueur id=%d\n", barb->id, player_unit->id);
+        unit_attack_unit(gs, barb, player_unit);
+        return;
+    }
+
+    /* Check for player city at destination → attack city */
+    int city_id = gs->map.tiles[ny][nx].city_id;
+    if (city_id != -1) {
+        City *city = city_by_id(gs, city_id);
+        if (city) {
+            printf("[Barbare %d] Attaque ville id=%d\n", barb->id, city_id);
+            unit_attack_city(gs, barb, city);
+            return;
+        }
+    }
+
+    barb->pm_left -= best_cost;
+    barb->x = nx;
+    barb->y = ny;
+}
