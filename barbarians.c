@@ -130,3 +130,81 @@ static void barb_move_toward(GameState *gs, Unit *barb, int tx, int ty) {
     barb->x = nx;
     barb->y = ny;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   SPAWN
+═══════════════════════════════════════════════════════════ */
+
+void barbarians_spawn(GameState *gs) {
+    int cap = gs->n_barbarian_camps_initial * BARB_UNIT_CAP_FACTOR;
+    if (gs->barb_unit_count >= cap) return;
+
+    for (Camp *camp = gs->camps; camp; camp = camp->next) {
+        if (!camp->alive) continue;
+        if (gs->barb_unit_count >= cap) break;
+        if (unit_any_at(gs, camp->x, camp->y)) continue;
+
+        unit_create(gs, UNIT_TYPE_BARB, UNIT_OWNER_BARB, camp->x, camp->y);
+        printf("[Camp barbare %d] Spawn guerrier barbare\n", camp->id);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MOVE AND ATTACK
+═══════════════════════════════════════════════════════════ */
+
+void barbarians_move_and_attack(GameState *gs) {
+    int barb_ids[256];
+    int n_barbs = 0;
+    for (Unit *u = gs->units; u; u = u->next)
+        if (u->owner == UNIT_OWNER_BARB && n_barbs < 256)
+            barb_ids[n_barbs++] = u->id;
+
+    for (int i = 0; i < n_barbs; i++) {
+        Unit *barb = unit_by_id(gs, barb_ids[i]);
+        if (!barb) continue;
+
+        barb->pm_left = barb->pm_max;
+
+        int tx, ty;
+        if (!find_nearest_target(gs, barb->x, barb->y, &tx, &ty)) continue;
+
+        int dist = chebyshev(barb->x, barb->y, tx, ty);
+
+        if (dist == 1) {
+            Unit *player_unit = unit_at(gs, tx, ty, UNIT_OWNER_PLAYER);
+            if (player_unit) {
+                printf("[Barbare %d] Attaque directe unite joueur id=%d\n",
+                       barb->id, player_unit->id);
+                unit_attack_unit(gs, barb, player_unit);
+                continue;
+            }
+            int cid = gs->map.tiles[ty][tx].city_id;
+            if (cid != -1) {
+                City *city = city_by_id(gs, cid);
+                if (city) {
+                    printf("[Barbare %d] Attaque directe ville id=%d\n", barb->id, cid);
+                    unit_attack_city(gs, barb, city);
+                    continue;
+                }
+            }
+        }
+
+        while (barb->pm_left > 0) {
+            int old_x = barb->x, old_y = barb->y;
+            barb_move_toward(gs, barb, tx, ty);
+            if (!unit_by_id(gs, barb_ids[i])) break;
+            if (barb->x == old_x && barb->y == old_y) break;
+            if (chebyshev(barb->x, barb->y, tx, ty) <= 1) break;
+        }
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FULL BARBARIAN PHASE
+═══════════════════════════════════════════════════════════ */
+
+void barbarians_turn(GameState *gs) {
+    barbarians_spawn(gs);
+    barbarians_move_and_attack(gs);
+}
