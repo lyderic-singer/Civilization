@@ -87,3 +87,60 @@ void game_free(GameState *gs) {
     free_map(&gs->map);
     free(gs);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   CLI DISPLAY
+═══════════════════════════════════════════════════════════ */
+
+void cli_print_map(GameState *gs) {
+    int W = gs->map.width;
+    int H = gs->map.height;
+
+    printf("   ");
+    for (int x = 0; x < W; x++) {
+        if (x % 10 == 0) printf("|");
+        else              printf("%d", x % 10);
+    }
+    printf("\n");
+
+    for (int y = 0; y < H; y++) {
+        printf("%2d ", y);
+        for (int x = 0; x < W; x++) {
+            Unit *pu = unit_at(gs, x, y, UNIT_OWNER_PLAYER);
+            Unit *bu = unit_at(gs, x, y, UNIT_OWNER_BARB);
+            int cid  = gs->map.tiles[y][x].city_id;
+            int pid  = gs->map.tiles[y][x].camp_id;
+
+            char ch;
+            if (pu) {
+                ch = (pu->type == UNIT_TYPE_SETTLER) ? 'S' : 'W';
+            } else if (cid != -1) {
+                ch = 'C';
+            } else if (bu) {
+                ch = 'b';
+            } else if (pid != -1) {
+                int alive = 0;
+                for (Camp *c = gs->camps; c; c = c->next)
+                    if (c->id == pid && c->alive) { alive = 1; break; }
+                ch = alive ? 'X' : terrain_char(gs->map.tiles[y][x].terrain);
+            } else {
+                ch = terrain_char(gs->map.tiles[y][x].terrain);
+            }
+            putchar(ch);
+        }
+        printf("\n");
+    }
+
+    printf("\nLegende: .=Plaine T=Foret M=Montagne ~=Eau D=Desert _=Toundra\n");
+    printf("         C=Ville S=Colon W=Guerrier b=Barbare X=Camp barbare\n\n");
+}
+
+void cli_print_status(GameState *gs) {
+    printf("--- Tour %d/%d --- Or: %d --- Science en cours: %d/%d (%s) ---\n",
+           gs->turn, gs->turn_max, gs->gold,
+           gs->tech.science_stored,
+           gs->tech.researching != TECH_ID_NONE
+               ? tech_def(gs->tech.researching)->cost : 0,
+           gs->tech.researching != TECH_ID_NONE
+               ? tech_name(gs->tech.researching) : "aucune");
+}
