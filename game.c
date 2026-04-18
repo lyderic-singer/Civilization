@@ -331,3 +331,54 @@ static void unit_goto(GameState *gs, Unit *u, int tx, int ty) {
         if (!unit_by_id(gs, u->id)) break;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   GOLD / BANKRUPTCY
+═══════════════════════════════════════════════════════════ */
+
+static void apply_gold_phase(GameState *gs) {
+    int gold_income = 0;
+    for (City *c = gs->cities; c; c = c->next)
+        gold_income += c->yield_gold;
+
+    int unit_maint_total = 0;
+    for (Unit *u = gs->units; u; u = u->next)
+        if (u->owner == UNIT_OWNER_PLAYER) unit_maint_total += u->maint;
+
+    int building_maint_total = cities_total_building_maint(gs);
+    int expenses = unit_maint_total + building_maint_total;
+    gs->gold += gold_income - expenses;
+
+    if (gs->gold < 0) {
+        printf("[Banqueroute] Or < 0 (%d). ", gs->gold);
+        Unit *victim = NULL;
+        for (Unit *u = gs->units; u; u = u->next)
+            if (u->owner == UNIT_OWNER_PLAYER) { victim = u; break; }
+
+        if (victim) {
+            printf("Unite dissolue: %s id=%d\n", unit_type_name(victim->type), victim->id);
+            unit_destroy(gs, victim->id);
+            gs->gold = 0;
+        } else {
+            printf("Aucune unite a dissoudre. Production divisee par 2.\n");
+            for (City *c = gs->cities; c; c = c->next)
+                c->yield_prod /= 2;
+        }
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SCIENCE PHASE
+═══════════════════════════════════════════════════════════ */
+
+static void apply_science_phase(GameState *gs) {
+    int total_sci = 0;
+    for (City *c = gs->cities; c; c = c->next)
+        total_sci += c->yield_science;
+
+    if (gs->tech.researching != TECH_ID_NONE) {
+        int completed = tech_add_science(&gs->tech, total_sci);
+        if (completed != TECH_ID_NONE)
+            tech_apply_effects(gs);
+    }
+}
