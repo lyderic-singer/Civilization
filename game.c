@@ -245,3 +245,89 @@ void cli_print_result(GameState *gs) {
     }
     printf("Score final: %d\n\n", gs->score);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   SETTLER COLONISE
+═══════════════════════════════════════════════════════════ */
+
+int game_settler_colonise(GameState *gs, Unit *settler) {
+    if (settler->type != UNIT_TYPE_SETTLER || settler->owner != UNIT_OWNER_PLAYER) {
+        printf("Seul un Colon peut coloniser.\n");
+        return 0;
+    }
+    int x = settler->x, y = settler->y;
+
+    TerrainType t = gs->map.tiles[y][x].terrain;
+    if (t == TERRAIN_WATER) {
+        printf("Impossible de fonder une ville sur l'eau.\n");
+        return 0;
+    }
+
+    if (gs->map.tiles[y][x].city_id != -1 || gs->map.tiles[y][x].camp_id != -1) {
+        printf("Tuile deja occupee.\n");
+        return 0;
+    }
+
+    for (City *c = gs->cities; c; c = c->next) {
+        int dx = c->x - x; if (dx < 0) dx = -dx;
+        int dy = c->y - y; if (dy < 0) dy = -dy;
+        int d = dx > dy ? dx : dy;
+        if (d < CITY_MIN_DISTANCE) {
+            printf("Trop proche d'une ville existante (distance Chebyshev: %d < %d).\n",
+                   d, CITY_MIN_DISTANCE);
+            return 0;
+        }
+    }
+
+    int sid = settler->id;
+    unit_destroy(gs, sid);
+    city_create(gs, x, y, gs->turn);
+    printf("[Fondation] Nouvelle ville en (%d,%d)!\n", x, y);
+    return 1;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   GREEDY PATHFINDER  (for 'goto' command)
+═══════════════════════════════════════════════════════════ */
+
+static const int MOVE_COSTS[TERRAIN_COUNT] = {
+    TERRAIN_PLAIN_COST, TERRAIN_FOREST_COST, TERRAIN_MOUNTAIN_COST,
+    TERRAIN_WATER_COST, TERRAIN_DESERT_COST, TERRAIN_TUNDRA_COST
+};
+
+static int cheb(int ax, int ay, int bx, int by) {
+    int dx = ax - bx; if (dx < 0) dx = -dx;
+    int dy = ay - by; if (dy < 0) dy = -dy;
+    return dx > dy ? dx : dy;
+}
+
+static void unit_goto(GameState *gs, Unit *u, int tx, int ty) {
+    while (u->pm_left > 0) {
+        if (u->x == tx && u->y == ty) break;
+        int best_dx = 0, best_dy = 0;
+        int best_d = cheb(u->x, u->y, tx, ty);
+        int best_cost = 999;
+
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if (dx == 0 && dy == 0) continue;
+                int nx = u->x + dx, ny = u->y + dy;
+                if (nx < 0 || nx >= gs->map.width || ny < 0 || ny >= gs->map.height) continue;
+                TerrainType t = gs->map.tiles[ny][nx].terrain;
+                int cost = MOVE_COSTS[t];
+                if (cost == 0 || cost > u->pm_left) continue;
+                Unit *occ = unit_at(gs, nx, ny, UNIT_OWNER_PLAYER);
+                if (occ && occ->id != u->id) continue;
+                int d = cheb(nx, ny, tx, ty);
+                if (d < best_d || (d == best_d && cost < best_cost)) {
+                    best_d = d; best_cost = cost;
+                    best_dx = dx; best_dy = dy;
+                }
+            }
+        }
+        if (best_dx == 0 && best_dy == 0) break;
+        int nx = u->x + best_dx, ny = u->y + best_dy;
+        if (!unit_move(gs, u, nx, ny)) break;
+        if (!unit_by_id(gs, u->id)) break;
+    }
+}
