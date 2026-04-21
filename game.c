@@ -489,3 +489,45 @@ void game_run(GameState *gs) {
     game_compute_score(gs);
     cli_print_result(gs);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PLAYER ACTION PHASE  (CLI)
+═══════════════════════════════════════════════════════════ */
+
+void game_phase_action(GameState *gs) {
+    units_reset_pm(gs, UNIT_OWNER_PLAYER);
+
+    cli_print_map(gs);
+    cli_print_status(gs);
+    cli_print_help();
+
+    char line[256];
+    while (1) {
+        printf("> ");
+        fflush(stdout);
+        if (!fgets(line, sizeof line, stdin)) break;
+
+        size_t len = strlen(line);
+        if (len > 0 && line[len-1] == '\n') line[len-1] = '\0';
+
+        char *cmd = strtok(line, " ");
+        if (!cmd) continue;
+
+        if (strcmp(cmd, "end") == 0) break;
+
+        else if (strcmp(cmd, "quit") == 0) {
+            printf("Au revoir.\n");
+            game_compute_score(gs);
+            cli_print_result(gs);
+            game_free(gs);
+            exit(0);
+        }
+        else if (strcmp(cmd, "m") == 0) { cli_print_map(gs); }
+        else if (strcmp(cmd, "s") == 0) { cli_print_status(gs); }
+        else if (strcmp(cmd, "u") == 0) { cli_print_units(gs); }
+        else if (strcmp(cmd, "c") == 0) { cli_print_cities(gs); }
+        else if (strcmp(cmd, "t") == 0) { cli_print_tech(gs); }
+        else if (strcmp(cmd, "help") == 0) { cli_print_help(); }
+        else { printf("Commande inconnue. Tapez 'help'.\n"); }
+    }
+}
