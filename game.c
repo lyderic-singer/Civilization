@@ -438,3 +438,54 @@ int game_compute_score(GameState *gs) {
     gs->score = score;
     return score;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PHASE FUNCTIONS
+═══════════════════════════════════════════════════════════ */
+
+void game_phase_production(GameState *gs) {
+    cities_compute_yields(gs);
+    cities_produce(gs);
+    apply_gold_phase(gs);
+    apply_science_phase(gs);
+}
+
+void game_phase_growth(GameState *gs) {
+    cities_grow(gs);
+}
+
+void game_phase_barbarians(GameState *gs) {
+    barbarians_turn(gs);
+}
+
+void game_phase_end(GameState *gs) {
+    cities_heal(gs);
+    cities_reset_damage_flag(gs);
+    gs->result = game_check_result(gs);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MAIN LOOP
+═══════════════════════════════════════════════════════════ */
+
+void game_run(GameState *gs) {
+    cities_compute_yields(gs);
+
+    while (gs->result == RESULT_ONGOING) {
+        game_phase_action(gs);
+        if (gs->result != RESULT_ONGOING) break;
+
+        game_phase_production(gs);
+        game_phase_growth(gs);
+        game_phase_barbarians(gs);
+        game_phase_end(gs);
+
+        if (gs->result == RESULT_ONGOING) {
+            gs->turn++;
+            cities_compute_yields(gs);
+        }
+    }
+
+    game_compute_score(gs);
+    cli_print_result(gs);
+}
