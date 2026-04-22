@@ -564,6 +564,50 @@ void game_phase_action(GameState *gs) {
             game_settler_colonise(gs, u);
         }
 
+        else if (strcmp(cmd, "proj") == 0) {
+            char *s_cid  = strtok(NULL, " ");
+            char *s_type = strtok(NULL, " ");
+            char *s_pid  = strtok(NULL, " ");
+            if (!s_cid || !s_type || !s_pid) {
+                printf("Usage: proj <city_id> <u|b> <id>\n");
+                printf("  u = unite: 0=Colon 1=Guerrier\n");
+                printf("  b = batiment: 1=Grenier 2=Atelier 4=Biblio 8=Marche 16=Caserne 32=Muraille\n");
+                continue;
+            }
+            int cid = atoi(s_cid);
+            int pid = atoi(s_pid);
+            City *city = city_by_id(gs, cid);
+            if (!city) { printf("Ville invalide.\n"); continue; }
+
+            if (s_type[0] == 'u') {
+                UnitType ut = (UnitType)pid;
+                if (ut == UNIT_TYPE_WARRIOR && !gs->warrior_unlocked) {
+                    printf("Artisanat requis pour produire un Guerrier.\n"); continue;
+                }
+                city_set_project(city, PROJECT_UNIT, pid);
+                printf("[Ville %d] Projet: %s\n", cid, unit_type_name(ut));
+            } else if (s_type[0] == 'b') {
+                if (!city_can_build(gs, city, pid)) {
+                    printf("Batiment non disponible.\n"); continue;
+                }
+                city_set_project(city, PROJECT_BUILDING, pid);
+                printf("[Ville %d] Projet: %s\n", cid, building_name(pid));
+            } else {
+                printf("Type invalide (u ou b).\n");
+            }
+        }
+
+        else if (strcmp(cmd, "research") == 0) {
+            char *s_id = strtok(NULL, " ");
+            if (!s_id) { cli_print_tech(gs); continue; }
+            int tid = atoi(s_id);
+            if (!tech_available(&gs->tech, tid)) {
+                printf("Technologie non disponible.\n"); continue;
+            }
+            tech_set_research(&gs->tech, tid);
+            printf("Recherche lancee: %s\n", tech_name(tid));
+        }
+
         else { printf("Commande inconnue. Tapez 'help'.\n"); }
     }
 }
