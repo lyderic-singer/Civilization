@@ -528,6 +528,42 @@ void game_phase_action(GameState *gs) {
         else if (strcmp(cmd, "c") == 0) { cli_print_cities(gs); }
         else if (strcmp(cmd, "t") == 0) { cli_print_tech(gs); }
         else if (strcmp(cmd, "help") == 0) { cli_print_help(); }
+        else if (strcmp(cmd, "move") == 0) {
+            char *s_id = strtok(NULL, " ");
+            char *s_dx = strtok(NULL, " ");
+            char *s_dy = strtok(NULL, " ");
+            if (!s_id || !s_dx || !s_dy) { printf("Usage: move <id> <dx> <dy>\n"); continue; }
+            int uid = atoi(s_id);
+            int dx  = atoi(s_dx);
+            int dy  = atoi(s_dy);
+            Unit *u = unit_by_id(gs, uid);
+            if (!u || u->owner != UNIT_OWNER_PLAYER) { printf("Unite invalide.\n"); continue; }
+            int ok = unit_move(gs, u, u->x + dx, u->y + dy);
+            if (!ok) printf("Deplacement impossible.\n");
+        }
+
+        else if (strcmp(cmd, "goto") == 0) {
+            char *s_id = strtok(NULL, " ");
+            char *s_x  = strtok(NULL, " ");
+            char *s_y  = strtok(NULL, " ");
+            if (!s_id || !s_x || !s_y) { printf("Usage: goto <id> <x> <y>\n"); continue; }
+            int uid = atoi(s_id);
+            int tx  = atoi(s_x);
+            int ty  = atoi(s_y);
+            Unit *u = unit_by_id(gs, uid);
+            if (!u || u->owner != UNIT_OWNER_PLAYER) { printf("Unite invalide.\n"); continue; }
+            unit_goto(gs, u, tx, ty);
+        }
+
+        else if (strcmp(cmd, "col") == 0) {
+            char *s_id = strtok(NULL, " ");
+            if (!s_id) { printf("Usage: col <id>\n"); continue; }
+            int uid = atoi(s_id);
+            Unit *u = unit_by_id(gs, uid);
+            if (!u) { printf("Unite invalide.\n"); continue; }
+            game_settler_colonise(gs, u);
+        }
+
         else { printf("Commande inconnue. Tapez 'help'.\n"); }
     }
 }
