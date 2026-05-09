@@ -50,23 +50,24 @@ typedef struct {
     int      cost;            /* science points */
     int      prereqs[4];      /* prereq tech IDs, -1 = none */
     int      prereq_count;
-    int      unlock_warrior;
-    int      unlock_wall;
-    int      unlock_library;
-    int      unlock_market;
-    int      bonus_food_pct;
+    /* effects stored as deltas; game.c applies them */
+    int      unlock_warrior;  /* 1 = unlocks warrior unit */
+    int      unlock_wall;     /* 1 = unlocks wall building */
+    int      unlock_library;  /* 1 = unlocks library building */
+    int      unlock_market;   /* 1 = unlocks market building */
+    int      bonus_food_pct;  /* % bonus to all city food */
     int      bonus_prod_pct;
     int      bonus_sci_pct;
     int      bonus_gold_pct;
-    int      bonus_pm;
-    int      bonus_forest_food;
-    int      bonus_food2_pct;
+    int      bonus_pm;        /* +PM to all terrestrial units */
+    int      bonus_forest_food; /* +food on forest tiles */
+    int      bonus_food2_pct; /* stacked irrigation bonus */
 } TechDef;
 
 typedef struct {
-    int  acquired[TECH_COUNT];
-    int  researching;
-    int  science_stored;
+    int  acquired[TECH_COUNT];   /* 0 or 1 */
+    int  researching;            /* TECH_ID_xxx or TECH_ID_NONE */
+    int  science_stored;         /* accumulated science toward current research */
 } TechState;
 
 /* ═══════════════════════════════════════════════════════════
@@ -141,6 +142,7 @@ typedef struct {
     TerrainType terrain;
     int         city_id;   /* -1 = none */
     int         camp_id;   /* -1 = none */
+    /* unit presence resolved at runtime via unit list */
 } Tile;
 
 /* ═══════════════════════════════════════════════════════════
@@ -157,8 +159,8 @@ typedef struct {
 ═══════════════════════════════════════════════════════════ */
 
 typedef struct {
-    uint64_t parts[3];
-    char     hex[SEED_HEX_LEN + 1];
+    uint64_t parts[3];   /* 192 bits total; we display 160 = 40 hex chars */
+    char     hex[SEED_HEX_LEN + 1]; /* human-readable */
 } Seed;
 
 /* ═══════════════════════════════════════════════════════════
@@ -176,21 +178,29 @@ typedef enum {
 
 typedef struct {
     Map        map;
-    Unit      *units;
-    City      *cities;
-    Camp      *camps;
+    Unit      *units;          /* player + barb units, linked list */
+    City      *cities;         /* player cities, linked list */
+    Camp      *camps;          /* barb camps, linked list */
     TechState  tech;
 
+    /* global resources */
     int        gold;
+    /* food/prod are per-city; science accumulates in TechState */
+
+    /* counters */
     int        turn;
     int        turn_max;
     int        n_barbarian_camps_initial;
     int        n_camps_destroyed;
     int        barb_unit_count;
 
-    int        territorial_consecutive_turns;
-    int        zero_prod_turns;
+    /* victory tracking */
+    int        territorial_consecutive_turns; /* consecutive turns with 10+ cities */
 
+    /* bankruptcy tracking */
+    int        zero_prod_turns;  /* consecutive turns with total production = 0 */
+
+    /* last unit id assigned */
     int        next_unit_id;
     int        next_city_id;
     int        next_camp_id;
@@ -199,7 +209,7 @@ typedef struct {
     GameResult result;
     int        score;
 
-    /* tech effect cache */
+    /* tech effect cache (recomputed after each tech acquired) */
     int        bonus_food_pct;
     int        bonus_prod_pct;
     int        bonus_sci_pct;

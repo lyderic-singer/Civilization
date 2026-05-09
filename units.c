@@ -97,6 +97,7 @@ int units_count(GameState *gs, UnitOwner owner) {
    MOVEMENT
 ═══════════════════════════════════════════════════════════ */
 
+/* Returns terrain move cost, 0 if impassable (water or out of bounds) */
 static int tile_move_cost(GameState *gs, int x, int y) {
     if (x < 0 || x >= gs->map.width || y < 0 || y >= gs->map.height)
         return 0;
@@ -116,21 +117,24 @@ int unit_move(GameState *gs, Unit *u, int nx, int ny) {
         return 0;
 
     int cost = tile_move_cost(gs, nx, ny);
-    if (cost == 0) return 0;
-    if (u->pm_left < cost) return 0;
+    if (cost == 0) return 0; /* impassable (water) */
+    if (u->pm_left < cost) return 0; /* not enough PM */
 
-    /* Check for enemy unit at destination */
+    /* Check for enemy unit at destination → combat */
     Unit *enemy = unit_any_at(gs, nx, ny);
     if (enemy) {
-        if (enemy->owner == u->owner) return 0;
+        if (enemy->owner == u->owner) return 0; /* friendly blocking */
+        /* Attack enemy unit; if it dies we can move, else we stay */
         int killed = unit_attack_unit(gs, u, enemy);
         if (!killed) return 0;
+        /* enemy was killed, fall through to move */
     }
 
-    /* Check for barb camp at destination (player unit raiding) */
+    /* Check for enemy camp at destination (player warrior on barb camp) */
     if (u->owner == UNIT_OWNER_PLAYER) {
         int camp_id = gs->map.tiles[ny][nx].camp_id;
         if (camp_id != -1) {
+            /* Destroy camp, award gold */
             for (Camp *c = gs->camps; c; c = c->next) {
                 if (c->id == camp_id && c->alive) {
                     c->alive = 0;
@@ -144,8 +148,15 @@ int unit_move(GameState *gs, Unit *u, int nx, int ny) {
                 }
             }
         }
+
+        /* Check for enemy city at destination */
+        int city_id = gs->map.tiles[ny][nx].city_id;
+        if (city_id != -1) {
+            /* Only barbarians have enemy cities vs player in base game — skip */
+        }
     }
 
+    /* Move the unit */
     u->pm_left -= cost;
     u->x = nx;
     u->y = ny;
@@ -159,27 +170,14 @@ void units_reset_pm(GameState *gs, UnitOwner owner) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   TECH BONUS APPLICATION
-═══════════════════════════════════════════════════════════ */
-
-void units_apply_pm_bonus(GameState *gs) {
-    for (Unit *u = gs->units; u; u = u->next) {
-        if (u->owner == UNIT_OWNER_PLAYER) {
-            u->pm_max = unit_pm_base(u->type) + gs->extra_pm;
-            if (u->pm_left > u->pm_max) u->pm_left = u->pm_max;
-        }
-    }
-}
-
-/* ═══════════════════════════════════════════════════════════
    COMBAT
 ═══════════════════════════════════════════════════════════ */
 
 int unit_attack_unit(GameState *gs, Unit *attacker, Unit *defender) {
-    int dmg_to_def = attacker->attack - defender->defense;
+    int dmg_to_def  = attacker->attack - defender->defense;
     if (dmg_to_def < 1) dmg_to_def = 1;
 
-    int dmg_to_atk = defender->attack - attacker->defense;
+    int dmg_to_atk  = defender->attack - attacker->defense;
     if (dmg_to_atk < 0) dmg_to_atk = 0;
 
     defender->hp -= dmg_to_def;
@@ -204,14 +202,15 @@ int unit_attack_unit(GameState *gs, Unit *attacker, Unit *defender) {
 }
 
 int unit_attack_city(GameState *gs, Unit *attacker, City *city) {
-    int has_wall  = (city->buildings & BUILDING_WALL) ? 1 : 0;
+    /* City defense */
+    int has_wall = (city->buildings & BUILDING_WALL) ? 1 : 0;
     int city_def  = has_wall ? CITY_DEFENSE_WALL : CITY_DEFENSE_BASE;
-    int city_atk  = city_def;
+    int city_atk  = city_def; /* city attacks and defends with same value */
 
-    int dmg_to_city = attacker->attack - city_def;
+    int dmg_to_city   = attacker->attack - city_def;
     if (dmg_to_city < 1) dmg_to_city = 1;
 
-    int dmg_to_unit = city_atk - attacker->defense;
+    int dmg_to_unit   = city_atk - attacker->defense;
     if (dmg_to_unit < 0) dmg_to_unit = 0;
 
     city->hp -= dmg_to_city;
@@ -221,8 +220,9 @@ int unit_attack_city(GameState *gs, Unit *attacker, City *city) {
     printf("[Siege] %s attaque ville id=%d → ville -%d PV, unite -%d PV\n",
            unit_type_name(attacker->type), city->id, dmg_to_city, dmg_to_unit);
 
-    if (attacker->hp <= 0)
+    if (attacker->hp <= 0) {
         unit_destroy(gs, attacker->id);
+    }
 
     if (city->hp <= 0) {
         printf("[Ville rasee] id=%d\n", city->id);
@@ -230,4 +230,17 @@ int unit_attack_city(GameState *gs, Unit *attacker, City *city) {
         return 1;
     }
     return 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TECH BONUS APPLICATION
+═══════════════════════════════════════════════════════════ */
+
+void units_apply_pm_bonus(GameState *gs) {
+    for (Unit *u = gs->units; u; u = u->next) {
+        if (u->owner == UNIT_OWNER_PLAYER) {
+            u->pm_max = unit_pm_base(u->type) + gs->extra_pm;
+            if (u->pm_left > u->pm_max) u->pm_left = u->pm_max;
+        }
+    }
 }

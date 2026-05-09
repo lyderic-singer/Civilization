@@ -6,16 +6,17 @@
 #include <string.h>
 
 /* ═══════════════════════════════════════════════════════════
-   TECH DEFINITIONS
+   TECH DEFINITIONS  (matches config.h TECH_ID_* constants)
+
    Graph (DAG):
-     Hunting    <- start
-     Farming    <- start
-     Irrigation <- Farming
-     Craft      <- start
-     Masonry    <- Craft
-     Writing    <- start
-     Commerce   <- Craft + Writing
-     Riding     <- start
+     Hunting    ← Depart
+     Farming    ← Depart
+     Irrigation ← Farming
+     Craft      ← Depart
+     Masonry    ← Craft
+     Writing    ← Depart
+     Commerce   ← Craft + Writing
+     Riding     ← Depart
 ═══════════════════════════════════════════════════════════ */
 
 static const TechDef TECH_DEFS[TECH_COUNT] = {
@@ -135,6 +136,7 @@ int tech_available(const TechState *ts, int tech_id) {
 
 void tech_set_research(TechState *ts, int tech_id) {
     if (ts->researching != TECH_ID_NONE && ts->researching != tech_id) {
+        /* Switching: lose half accumulated science */
         ts->science_stored /= 2;
         printf("[Recherche] Changement vers %s, cagnotte reduite a %d\n",
                tech_name(tech_id), ts->science_stored);
@@ -148,9 +150,9 @@ int tech_add_science(TechState *ts, int science) {
     const TechDef *def = &TECH_DEFS[ts->researching];
     if (ts->science_stored >= def->cost) {
         int completed = ts->researching;
-        ts->acquired[completed] = 1;
-        ts->researching         = TECH_ID_NONE;
-        ts->science_stored      = 0;
+        ts->acquired[completed]  = 1;
+        ts->researching          = TECH_ID_NONE;
+        ts->science_stored       = 0;
         printf("[Recherche] Technologie acquise: %s\n", def->name);
         return completed;
     }
@@ -165,19 +167,22 @@ int tech_all_acquired(const TechState *ts) {
 
 /* ═══════════════════════════════════════════════════════════
    EFFECT APPLICATION
+   Recomputes all bonus caches from scratch each call.
+   This avoids cumulative drift when called multiple times.
 ═══════════════════════════════════════════════════════════ */
 
 void tech_apply_effects(GameState *gs) {
-    gs->bonus_food_pct    = 0;
-    gs->bonus_prod_pct    = 0;
-    gs->bonus_sci_pct     = 0;
-    gs->bonus_gold_pct    = 0;
-    gs->extra_pm          = 0;
-    gs->bonus_forest_food = 0;
-    gs->warrior_unlocked  = 0;
-    gs->wall_unlocked     = 0;
-    gs->library_unlocked  = 0;
-    gs->market_unlocked   = 0;
+    /* Reset all bonus caches */
+    gs->bonus_food_pct     = 0;
+    gs->bonus_prod_pct     = 0;
+    gs->bonus_sci_pct      = 0;
+    gs->bonus_gold_pct     = 0;
+    gs->extra_pm           = 0;
+    gs->bonus_forest_food  = 0;
+    gs->warrior_unlocked   = 0;
+    gs->wall_unlocked      = 0;
+    gs->library_unlocked   = 0;
+    gs->market_unlocked    = 0;
 
     for (int i = 0; i < TECH_COUNT; i++) {
         if (!gs->tech.acquired[i]) continue;
@@ -194,5 +199,6 @@ void tech_apply_effects(GameState *gs) {
         if (d->unlock_market)  gs->market_unlocked  = 1;
     }
 
+    /* Propagate new PM to all existing player units */
     units_apply_pm_bonus(gs);
 }

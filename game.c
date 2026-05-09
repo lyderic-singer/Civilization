@@ -52,7 +52,7 @@ GameState *game_init(int width, int height, int turns, int n_barb_camps, Seed se
     gs->seed              = seed;
 
     tech_init(&gs->tech);
-    tech_apply_effects(gs);
+    tech_apply_effects(gs); /* zero everything out cleanly */
 
     gen_map(gs);
 
@@ -96,6 +96,7 @@ void cli_print_map(GameState *gs) {
     int W = gs->map.width;
     int H = gs->map.height;
 
+    /* Top ruler */
     printf("   ");
     for (int x = 0; x < W; x++) {
         if (x % 10 == 0) printf("|");
@@ -106,6 +107,7 @@ void cli_print_map(GameState *gs) {
     for (int y = 0; y < H; y++) {
         printf("%2d ", y);
         for (int x = 0; x < W; x++) {
+            /* Overlay priority: player unit > barb unit > city > camp > terrain */
             Unit *pu = unit_at(gs, x, y, UNIT_OWNER_PLAYER);
             Unit *bu = unit_at(gs, x, y, UNIT_OWNER_BARB);
             int cid  = gs->map.tiles[y][x].city_id;
@@ -119,6 +121,7 @@ void cli_print_map(GameState *gs) {
             } else if (bu) {
                 ch = 'b';
             } else if (pid != -1) {
+                /* check camp alive */
                 int alive = 0;
                 for (Camp *c = gs->camps; c; c = c->next)
                     if (c->id == pid && c->alive) { alive = 1; break; }
@@ -139,10 +142,8 @@ void cli_print_status(GameState *gs) {
     printf("--- Tour %d/%d --- Or: %d --- Science en cours: %d/%d (%s) ---\n",
            gs->turn, gs->turn_max, gs->gold,
            gs->tech.science_stored,
-           gs->tech.researching != TECH_ID_NONE
-               ? tech_def(gs->tech.researching)->cost : 0,
-           gs->tech.researching != TECH_ID_NONE
-               ? tech_name(gs->tech.researching) : "aucune");
+           gs->tech.researching != TECH_ID_NONE ? tech_def(gs->tech.researching)->cost : 0,
+           gs->tech.researching != TECH_ID_NONE ? tech_name(gs->tech.researching) : "aucune");
 }
 
 void cli_print_units(GameState *gs) {
@@ -191,7 +192,7 @@ void cli_print_tech(GameState *gs) {
     for (int i = 0; i < TECH_COUNT; i++) {
         const TechDef *d = tech_def(i);
         const char *status;
-        if (gs->tech.acquired[i])         status = "[OK]";
+        if (gs->tech.acquired[i])       status = "[OK]";
         else if (gs->tech.researching == i) {
             static char buf[32];
             snprintf(buf, sizeof buf, "[%d/%d]", gs->tech.science_stored, d->cost);
@@ -211,9 +212,9 @@ void cli_print_help(void) {
     printf("  c           Lister les villes\n");
     printf("  t           Arbre technologique\n");
     printf("  move <id> <dx> <dy>   Deplacer une unite\n");
-    printf("  goto <id> <x> <y>    Deplacer vers (x,y) (greedy)\n");
+    printf("  goto <id> <x> <y>    Deplacer une unite vers (x,y) (greedy)\n");
     printf("  col <id>             Coloniser (settler uniquement)\n");
-    printf("  proj <city_id> <type> <id>   Definir projet\n");
+    printf("  proj <city_id> <type> <id>   Definir projet (type: u=unite b=batiment)\n");
     printf("  research <tech_id>   Lancer recherche\n");
     printf("  end                  Passer au tour suivant\n");
     printf("  help                 Afficher cette aide\n");
@@ -257,17 +258,20 @@ int game_settler_colonise(GameState *gs, Unit *settler) {
     }
     int x = settler->x, y = settler->y;
 
+    /* Tile must be passable land */
     TerrainType t = gs->map.tiles[y][x].terrain;
     if (t == TERRAIN_WATER) {
         printf("Impossible de fonder une ville sur l'eau.\n");
         return 0;
     }
 
+    /* No existing city or camp on tile */
     if (gs->map.tiles[y][x].city_id != -1 || gs->map.tiles[y][x].camp_id != -1) {
         printf("Tuile deja occupee.\n");
         return 0;
     }
 
+    /* Distance check: >= CITY_MIN_DISTANCE from every other city */
     for (City *c = gs->cities; c; c = c->next) {
         int dx = c->x - x; if (dx < 0) dx = -dx;
         int dy = c->y - y; if (dy < 0) dy = -dy;
@@ -279,8 +283,11 @@ int game_settler_colonise(GameState *gs, Unit *settler) {
         }
     }
 
+    /* Destroy the settler */
     int sid = settler->id;
     unit_destroy(gs, sid);
+
+    /* Create city */
     city_create(gs, x, y, gs->turn);
     printf("[Fondation] Nouvelle ville en (%d,%d)!\n", x, y);
     return 1;
@@ -288,6 +295,8 @@ int game_settler_colonise(GameState *gs, Unit *settler) {
 
 /* ═══════════════════════════════════════════════════════════
    GREEDY PATHFINDER  (for 'goto' command)
+   Moves unit step-by-step toward (tx,ty) using Chebyshev-greedy
+   same as barbarians, stopping when PM is exhausted.
 ═══════════════════════════════════════════════════════════ */
 
 static const int MOVE_COSTS[TERRAIN_COUNT] = {
@@ -316,6 +325,7 @@ static void unit_goto(GameState *gs, Unit *u, int tx, int ty) {
                 TerrainType t = gs->map.tiles[ny][nx].terrain;
                 int cost = MOVE_COSTS[t];
                 if (cost == 0 || cost > u->pm_left) continue;
+                /* Don't walk onto friendly units */
                 Unit *occ = unit_at(gs, nx, ny, UNIT_OWNER_PLAYER);
                 if (occ && occ->id != u->id) continue;
                 int d = cheb(nx, ny, tx, ty);
@@ -328,7 +338,7 @@ static void unit_goto(GameState *gs, Unit *u, int tx, int ty) {
         if (best_dx == 0 && best_dy == 0) break;
         int nx = u->x + best_dx, ny = u->y + best_dy;
         if (!unit_move(gs, u, nx, ny)) break;
-        if (!unit_by_id(gs, u->id)) break;
+        if (!unit_by_id(gs, u->id)) break; /* destroyed in combat */
     }
 }
 
@@ -337,20 +347,25 @@ static void unit_goto(GameState *gs, Unit *u, int tx, int ty) {
 ═══════════════════════════════════════════════════════════ */
 
 static void apply_gold_phase(GameState *gs) {
+    /* Compute income from all cities */
     int gold_income = 0;
     for (City *c = gs->cities; c; c = c->next)
         gold_income += c->yield_gold;
 
+    /* Maintenance: units */
     int unit_maint_total = 0;
     for (Unit *u = gs->units; u; u = u->next)
         if (u->owner == UNIT_OWNER_PLAYER) unit_maint_total += u->maint;
 
+    /* Maintenance: buildings */
     int building_maint_total = cities_total_building_maint(gs);
+
     int expenses = unit_maint_total + building_maint_total;
     gs->gold += gold_income - expenses;
 
     if (gs->gold < 0) {
         printf("[Banqueroute] Or < 0 (%d). ", gs->gold);
+        /* Find a random player unit to dissolve */
         Unit *victim = NULL;
         for (Unit *u = gs->units; u; u = u->next)
             if (u->owner == UNIT_OWNER_PLAYER) { victim = u; break; }
@@ -360,7 +375,7 @@ static void apply_gold_phase(GameState *gs) {
             unit_destroy(gs, victim->id);
             gs->gold = 0;
         } else {
-            printf("Aucune unite a dissoudre. Production divisee par 2.\n");
+            printf("Aucune unite a dissoudre. Production de toutes les villes divisee par 2.\n");
             for (City *c = gs->cities; c; c = c->next)
                 c->yield_prod /= 2;
         }
@@ -378,8 +393,9 @@ static void apply_science_phase(GameState *gs) {
 
     if (gs->tech.researching != TECH_ID_NONE) {
         int completed = tech_add_science(&gs->tech, total_sci);
-        if (completed != TECH_ID_NONE)
+        if (completed != TECH_ID_NONE) {
             tech_apply_effects(gs);
+        }
     }
 }
 
@@ -388,9 +404,11 @@ static void apply_science_phase(GameState *gs) {
 ═══════════════════════════════════════════════════════════ */
 
 GameResult game_check_result(GameState *gs) {
+    /* Scientific victory */
     if (tech_all_acquired(&gs->tech))
         return RESULT_WIN_SCI;
 
+    /* Territorial victory: >= 10 cities for 5 consecutive turns */
     if (cities_count(gs) >= VICTORY_TERRITORIAL_CITIES) {
         gs->territorial_consecutive_turns++;
         if (gs->territorial_consecutive_turns >= VICTORY_TERRITORIAL_TURNS)
@@ -399,12 +417,15 @@ GameResult game_check_result(GameState *gs) {
         gs->territorial_consecutive_turns = 0;
     }
 
+    /* Defeat: no cities */
     if (cities_count(gs) == 0)
         return RESULT_LOSS_NOCITY;
 
+    /* Defeat: turn limit */
     if (gs->turn > gs->turn_max)
         return RESULT_LOSS_TURNS;
 
+    /* Defeat: total production = 0 for N consecutive turns */
     int total_prod = 0;
     for (City *c = gs->cities; c; c = c->next) total_prod += c->yield_prod;
     if (total_prod == 0) {
@@ -443,58 +464,8 @@ int game_compute_score(GameState *gs) {
    PHASE FUNCTIONS
 ═══════════════════════════════════════════════════════════ */
 
-void game_phase_production(GameState *gs) {
-    cities_compute_yields(gs);
-    cities_produce(gs);
-    apply_gold_phase(gs);
-    apply_science_phase(gs);
-}
-
-void game_phase_growth(GameState *gs) {
-    cities_grow(gs);
-}
-
-void game_phase_barbarians(GameState *gs) {
-    barbarians_turn(gs);
-}
-
-void game_phase_end(GameState *gs) {
-    cities_heal(gs);
-    cities_reset_damage_flag(gs);
-    gs->result = game_check_result(gs);
-}
-
-/* ═══════════════════════════════════════════════════════════
-   MAIN LOOP
-═══════════════════════════════════════════════════════════ */
-
-void game_run(GameState *gs) {
-    cities_compute_yields(gs);
-
-    while (gs->result == RESULT_ONGOING) {
-        game_phase_action(gs);
-        if (gs->result != RESULT_ONGOING) break;
-
-        game_phase_production(gs);
-        game_phase_growth(gs);
-        game_phase_barbarians(gs);
-        game_phase_end(gs);
-
-        if (gs->result == RESULT_ONGOING) {
-            gs->turn++;
-            cities_compute_yields(gs);
-        }
-    }
-
-    game_compute_score(gs);
-    cli_print_result(gs);
-}
-
-/* ═══════════════════════════════════════════════════════════
-   PLAYER ACTION PHASE  (CLI)
-═══════════════════════════════════════════════════════════ */
-
 void game_phase_action(GameState *gs) {
+    /* Reset PM for player units */
     units_reset_pm(gs, UNIT_OWNER_PLAYER);
 
     cli_print_map(gs);
@@ -507,9 +478,11 @@ void game_phase_action(GameState *gs) {
         fflush(stdout);
         if (!fgets(line, sizeof line, stdin)) break;
 
+        /* strip trailing newline */
         size_t len = strlen(line);
         if (len > 0 && line[len-1] == '\n') line[len-1] = '\0';
 
+        /* Tokenise */
         char *cmd = strtok(line, " ");
         if (!cmd) continue;
 
@@ -522,12 +495,26 @@ void game_phase_action(GameState *gs) {
             game_free(gs);
             exit(0);
         }
-        else if (strcmp(cmd, "m") == 0) { cli_print_map(gs); }
-        else if (strcmp(cmd, "s") == 0) { cli_print_status(gs); }
-        else if (strcmp(cmd, "u") == 0) { cli_print_units(gs); }
-        else if (strcmp(cmd, "c") == 0) { cli_print_cities(gs); }
-        else if (strcmp(cmd, "t") == 0) { cli_print_tech(gs); }
-        else if (strcmp(cmd, "help") == 0) { cli_print_help(); }
+
+        else if (strcmp(cmd, "m") == 0) {
+            cli_print_map(gs);
+        }
+        else if (strcmp(cmd, "s") == 0) {
+            cli_print_status(gs);
+        }
+        else if (strcmp(cmd, "u") == 0) {
+            cli_print_units(gs);
+        }
+        else if (strcmp(cmd, "c") == 0) {
+            cli_print_cities(gs);
+        }
+        else if (strcmp(cmd, "t") == 0) {
+            cli_print_tech(gs);
+        }
+        else if (strcmp(cmd, "help") == 0) {
+            cli_print_help();
+        }
+
         else if (strcmp(cmd, "move") == 0) {
             char *s_id = strtok(NULL, " ");
             char *s_dx = strtok(NULL, " ");
@@ -588,7 +575,7 @@ void game_phase_action(GameState *gs) {
                 printf("[Ville %d] Projet: %s\n", cid, unit_type_name(ut));
             } else if (s_type[0] == 'b') {
                 if (!city_can_build(gs, city, pid)) {
-                    printf("Batiment non disponible.\n"); continue;
+                    printf("Batiment non disponible (deja construit ou prérequis manquant).\n"); continue;
                 }
                 city_set_project(city, PROJECT_BUILDING, pid);
                 printf("[Ville %d] Projet: %s\n", cid, building_name(pid));
@@ -602,14 +589,66 @@ void game_phase_action(GameState *gs) {
             if (!s_id) { cli_print_tech(gs); continue; }
             int tid = atoi(s_id);
             if (!tech_available(&gs->tech, tid)) {
-                printf("Technologie non disponible.\n"); continue;
+                printf("Technologie non disponible (deja acquise ou prerequis manquant).\n"); continue;
             }
             tech_set_research(&gs->tech, tid);
             printf("Recherche lancee: %s\n", tech_name(tid));
         }
 
-        else { printf("Commande inconnue. Tapez 'help'.\n"); }
+        else {
+            printf("Commande inconnue. Tapez 'help'.\n");
+        }
     }
+}
+
+void game_phase_production(GameState *gs) {
+    /* Yields were computed at start of action phase and again here for accuracy */
+    cities_compute_yields(gs);
+    cities_produce(gs);
+    apply_gold_phase(gs);
+    apply_science_phase(gs);
+}
+
+void game_phase_growth(GameState *gs) {
+    cities_grow(gs);
+}
+
+void game_phase_barbarians(GameState *gs) {
+    barbarians_turn(gs);
+}
+
+void game_phase_end(GameState *gs) {
+    cities_heal(gs);
+    cities_reset_damage_flag(gs);
+    gs->result = game_check_result(gs);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MAIN LOOP
+═══════════════════════════════════════════════════════════ */
+
+void game_run(GameState *gs) {
+    /* Compute initial yields for display */
+    cities_compute_yields(gs);
+
+    while (gs->result == RESULT_ONGOING) {
+        game_phase_action(gs);
+        if (gs->result != RESULT_ONGOING) break; /* quit called inside action */
+
+        game_phase_production(gs);
+        game_phase_growth(gs);
+        game_phase_barbarians(gs);
+        game_phase_end(gs);
+
+        if (gs->result == RESULT_ONGOING) {
+            gs->turn++;
+            /* Recompute yields for next turn display */
+            cities_compute_yields(gs);
+        }
+    }
+
+    game_compute_score(gs);
+    cli_print_result(gs);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -645,17 +684,20 @@ int game_main(int argc, char **argv) {
         } else if ((strcmp(argv[i], "--barbarians") == 0 || strcmp(argv[i], "-b") == 0) && i+1 < argc) {
             n_barbs = atoi(argv[++i]);
         } else if ((strcmp(argv[i], "--mode") == 0 || strcmp(argv[i], "-m") == 0) && i+1 < argc) {
-            i++;
+            i++; /* only 'cli' supported */
         } else if ((strcmp(argv[i], "--seed") == 0 || strcmp(argv[i], "-s") == 0) && i+1 < argc) {
             i++;
             const char *s = argv[i];
+            /* Try to detect hex string (contains letters or length > 10) */
             int is_hex = 0;
-            for (const char *p = s; *p; p++)
+            for (const char *p = s; *p; p++) {
                 if (isalpha((unsigned char)*p)) { is_hex = 1; break; }
-            if (is_hex || strlen(s) > 10)
+            }
+            if (is_hex || strlen(s) > 10) {
                 seed = gen_seed_from_hex(s);
-            else
+            } else {
                 seed = gen_seed_from_u64((uint64_t)atoll(s));
+            }
             has_seed = 1;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_usage(argv[0]);
@@ -667,6 +709,7 @@ int game_main(int argc, char **argv) {
         }
     }
 
+    /* Validate */
     if (width < 10 || height < 10) {
         fprintf(stderr, "Carte trop petite (minimum 10x10).\n");
         return 1;
@@ -683,4 +726,12 @@ int game_main(int argc, char **argv) {
     game_run(gs);
     game_free(gs);
     return 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   main()
+═══════════════════════════════════════════════════════════ */
+
+int main(int argc, char **argv) {
+    return game_main(argc, argv);
 }

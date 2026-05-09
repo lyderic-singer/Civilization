@@ -139,22 +139,10 @@ static int cheb(int ax, int ay, int bx, int by) {
    TERRAIN INFO  (local table mirror)
 ═══════════════════════════════════════════════════════════ */
 
-static const int T_FOOD[TERRAIN_COUNT] = {
-    TERRAIN_PLAIN_FOOD, TERRAIN_FOREST_FOOD, TERRAIN_MOUNTAIN_FOOD,
-    TERRAIN_WATER_FOOD, TERRAIN_DESERT_FOOD, TERRAIN_TUNDRA_FOOD
-};
-static const int T_PROD[TERRAIN_COUNT] = {
-    TERRAIN_PLAIN_PROD, TERRAIN_FOREST_PROD, TERRAIN_MOUNTAIN_PROD,
-    TERRAIN_WATER_PROD, TERRAIN_DESERT_PROD, TERRAIN_TUNDRA_PROD
-};
-static const int T_GOLD[TERRAIN_COUNT] = {
-    TERRAIN_PLAIN_GOLD, TERRAIN_FOREST_GOLD, TERRAIN_MOUNTAIN_GOLD,
-    TERRAIN_WATER_GOLD, TERRAIN_DESERT_GOLD, TERRAIN_TUNDRA_GOLD
-};
-static const int T_SCI[TERRAIN_COUNT] = {
-    TERRAIN_PLAIN_SCI, TERRAIN_FOREST_SCI, TERRAIN_MOUNTAIN_SCI,
-    TERRAIN_WATER_SCI, TERRAIN_DESERT_SCI, TERRAIN_TUNDRA_SCI
-};
+static const int T_FOOD[TERRAIN_COUNT]    = {TERRAIN_PLAIN_FOOD,    TERRAIN_FOREST_FOOD,   TERRAIN_MOUNTAIN_FOOD, TERRAIN_WATER_FOOD,    TERRAIN_DESERT_FOOD,   TERRAIN_TUNDRA_FOOD};
+static const int T_PROD[TERRAIN_COUNT]    = {TERRAIN_PLAIN_PROD,    TERRAIN_FOREST_PROD,   TERRAIN_MOUNTAIN_PROD, TERRAIN_WATER_PROD,    TERRAIN_DESERT_PROD,   TERRAIN_TUNDRA_PROD};
+static const int T_GOLD[TERRAIN_COUNT]    = {TERRAIN_PLAIN_GOLD,    TERRAIN_FOREST_GOLD,   TERRAIN_MOUNTAIN_GOLD, TERRAIN_WATER_GOLD,    TERRAIN_DESERT_GOLD,   TERRAIN_TUNDRA_GOLD};
+static const int T_SCI[TERRAIN_COUNT]     = {TERRAIN_PLAIN_SCI,     TERRAIN_FOREST_SCI,    TERRAIN_MOUNTAIN_SCI,  TERRAIN_WATER_SCI,     TERRAIN_DESERT_SCI,    TERRAIN_TUNDRA_SCI};
 
 /* ═══════════════════════════════════════════════════════════
    YIELD COMPUTATION
@@ -164,10 +152,15 @@ void cities_compute_yields(GameState *gs) {
     int W = gs->map.width;
     int H = gs->map.height;
 
+    /* Reset yields */
     for (City *c = gs->cities; c; c = c->next) {
-        c->yield_food = c->yield_prod = c->yield_gold = c->yield_science = 0;
+        c->yield_food    = 0;
+        c->yield_prod    = 0;
+        c->yield_gold    = 0;
+        c->yield_science = 0;
     }
 
+    /* For each tile, find the owning city (min chebyshev, tiebreak oldest) */
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
             City *owner = NULL;
@@ -179,9 +172,9 @@ void cities_compute_yields(GameState *gs) {
                 int r = city_exploit_radius(c->population);
                 if (d > r) continue;
                 if (d < best_dist || (d == best_dist && c->founded_turn < best_turn)) {
-                    best_dist = d;
-                    best_turn = c->founded_turn;
-                    owner     = c;
+                    best_dist  = d;
+                    best_turn  = c->founded_turn;
+                    owner      = c;
                 }
             }
             if (!owner) continue;
@@ -192,6 +185,7 @@ void cities_compute_yields(GameState *gs) {
             int gold = T_GOLD[t];
             int sci  = T_SCI[t];
 
+            /* Apply tech: bonus_forest_food */
             if (t == TERRAIN_FOREST) food += gs->bonus_forest_food;
 
             owner->yield_food    += food;
@@ -201,12 +195,14 @@ void cities_compute_yields(GameState *gs) {
         }
     }
 
+    /* Apply building bonuses and tech percentage bonuses */
     for (City *c = gs->cities; c; c = c->next) {
         if (c->buildings & BUILDING_GRANARY)  c->yield_food    += BUILDING_GRANARY_FOOD;
         if (c->buildings & BUILDING_WORKSHOP) c->yield_prod    += BUILDING_WORKSHOP_PROD;
         if (c->buildings & BUILDING_LIBRARY)  c->yield_science += BUILDING_LIBRARY_SCI;
         if (c->buildings & BUILDING_MARKET)   c->yield_gold    += BUILDING_MARKET_GOLD;
 
+        /* Tech percentage bonuses */
         c->yield_food    = c->yield_food    + c->yield_food    * gs->bonus_food_pct / 100;
         c->yield_prod    = c->yield_prod    + c->yield_prod    * gs->bonus_prod_pct / 100;
         c->yield_science = c->yield_science + c->yield_science * gs->bonus_sci_pct  / 100;
@@ -239,7 +235,7 @@ int city_project_cost(GameState *gs, City *c) {
 }
 
 int city_can_build(GameState *gs, City *c, int building_flag) {
-    if (c->buildings & building_flag) return 0;
+    if (c->buildings & building_flag) return 0; /* already built */
     switch (building_flag) {
         case BUILDING_GRANARY:  return 1;
         case BUILDING_WORKSHOP: return 1;
@@ -268,10 +264,11 @@ void cities_produce(GameState *gs) {
         if (c->project_type == PROJECT_BUILDING) {
             int flag = c->project_id;
             c->buildings |= flag;
-            city_recompute_hp(c);
+            city_recompute_hp(c); /* wall doubles HP */
             printf("[Ville %d] Construction complete: %s\n", c->id, building_name(flag));
         } else if (c->project_type == PROJECT_UNIT) {
             UnitType ut = (UnitType)c->project_id;
+            /* Military units require barracks */
             if (ut == UNIT_TYPE_WARRIOR && !(c->buildings & BUILDING_BARRACKS)) {
                 printf("[Ville %d] Caserne requise pour produire un Guerrier\n", c->id);
                 city_cancel_project(c);
@@ -291,12 +288,13 @@ void cities_produce(GameState *gs) {
 void cities_grow(GameState *gs) {
     City *next_city;
     for (City *c = gs->cities; c; c = next_city) {
-        next_city = c->next;
+        next_city = c->next; /* save before possible raze */
 
         int consumption = CITY_FOOD_CONSUMPTION_FACTOR * c->population;
         int net_food    = c->yield_food - consumption;
         c->food_stock  += net_food;
 
+        /* Growth threshold */
         int threshold = CITY_GROWTH_BASE + CITY_GROWTH_PER_POP * c->population;
         if (c->buildings & BUILDING_GRANARY)
             threshold = (int)(threshold / BUILDING_GRANARY_GROWTH_DIV);
@@ -344,9 +342,11 @@ void cities_reset_damage_flag(GameState *gs) {
 
 int cities_total_building_maint(GameState *gs) {
     int total = 0;
-    for (City *c = gs->cities; c; c = c->next)
-        for (int i = 0; i < BUILDING_COUNT; i++)
+    for (City *c = gs->cities; c; c = c->next) {
+        for (int i = 0; i < BUILDING_COUNT; i++) {
             if (c->buildings & BUILDINGS[i].flag)
                 total += BUILDINGS[i].maint;
+        }
+    }
     return total;
 }

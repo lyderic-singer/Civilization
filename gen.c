@@ -12,13 +12,11 @@
 
 /* ═══════════════════════════════════════════════════════════
    LCG PRNG  (fast, deterministic, seed-driven)
-   Knuth multiplicative LCG:
-   x_{n+1} = x_n * 6364136223846793005 + 1442695040888963407
+   Knuth multiplicative LCG: x_{n+1} = x_n * 6364136223846793005 + 1442695040888963407
 ═══════════════════════════════════════════════════════════ */
 
 uint64_t gen_lcg_next(uint64_t *state) {
-    *state = *state * UINT64_C(6364136223846793005)
-           + UINT64_C(1442695040888963407);
+    *state = *state * UINT64_C(6364136223846793005) + UINT64_C(1442695040888963407);
     return *state;
 }
 
@@ -30,6 +28,8 @@ int gen_rand_range(uint64_t *rng, int min_incl, int max_incl) {
 
 /* ═══════════════════════════════════════════════════════════
    SEED GENERATION
+   160-bit value displayed as 40 hex chars (ETH address width).
+   Internally we store 3 x uint64 (192 bits) and truncate display.
 ═══════════════════════════════════════════════════════════ */
 
 /* FNV-1a 64 on arbitrary bytes */
@@ -44,12 +44,16 @@ static uint64_t fnv1a_64(const void *data, size_t len) {
 }
 
 static void seed_fill_hex(Seed *s) {
+    /* Use first 160 bits (parts[0] + parts[1] + lower 32 bits of parts[2])
+       Displayed as 40 hex chars like an Ethereum address */
     uint8_t raw[20];
-    for (int i = 0; i < 8; i++) raw[i]    = (uint8_t)(s->parts[0] >> (56 - 8*i));
-    for (int i = 0; i < 8; i++) raw[8+i]  = (uint8_t)(s->parts[1] >> (56 - 8*i));
-    for (int i = 0; i < 4; i++) raw[16+i] = (uint8_t)(s->parts[2] >> (24 - 8*i));
-    for (int i = 0; i < 20; i++)
+    /* big-endian packing */
+    for (int i = 0; i < 8; i++) raw[i]     = (uint8_t)(s->parts[0] >> (56 - 8*i));
+    for (int i = 0; i < 8; i++) raw[8+i]   = (uint8_t)(s->parts[1] >> (56 - 8*i));
+    for (int i = 0; i < 4; i++) raw[16+i]  = (uint8_t)(s->parts[2] >> (24 - 8*i));
+    for (int i = 0; i < 20; i++) {
         snprintf(s->hex + 2*i, 3, "%02x", raw[i]);
+    }
     s->hex[SEED_HEX_LEN] = '\0';
 }
 
@@ -74,6 +78,7 @@ Seed gen_seed_from_u64(uint64_t raw) {
 }
 
 Seed gen_seed_from_hex(const char *hex) {
+    /* parse up to 40 hex chars back into parts */
     Seed s;
     memset(&s, 0, sizeof s);
     size_t len = strlen(hex);
@@ -91,23 +96,26 @@ Seed gen_seed_from_hex(const char *hex) {
     return s;
 }
 
-/* ═══════════════════════════════════════════════════════════
-   NOISE GENERATION
-═══════════════════════════════════════════════════════════ */
-
+/* Derive a single uint64 working RNG state from the seed */
 static uint64_t seed_to_rng(const Seed *s) {
-    uint64_t r = s->parts[0]
-               ^ (s->parts[1] * UINT64_C(0xdeadbeefcafe1337))
-               ^ s->parts[2];
+    uint64_t r = s->parts[0] ^ (s->parts[1] * UINT64_C(0xdeadbeefcafe1337)) ^ s->parts[2];
+    /* warm up */
     gen_lcg_next(&r);
     gen_lcg_next(&r);
     return r;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   NOISE GENERATION  (Diamond-Square / midpoint displacement
+   simplified to a two-pass octave noise for zone formation)
+═══════════════════════════════════════════════════════════ */
+
+/* Generate a float heightmap [0,1] using summed octave hash noise */
 static float *gen_heightmap(int W, int H, uint64_t *rng) {
     float *hmap = malloc(W * H * sizeof(float));
     if (!hmap) { perror("malloc"); exit(1); }
 
+    /* Seed a simple noise table */
     float noise_table[256];
     for (int i = 0; i < 256; i++)
         noise_table[i] = (float)(gen_lcg_next(rng) & 0xFFFF) / 65535.0f;
@@ -117,10 +125,10 @@ static float *gen_heightmap(int W, int H, uint64_t *rng) {
             float v = 0.0f;
             float amp = 1.0f, freq = 1.0f, total_amp = 0.0f;
             for (int o = 0; o < 4; o++) {
-                int ix  = (int)(x * freq) & 255;
-                int iy  = (int)(y * freq) & 255;
+                int ix = (int)(x * freq) & 255;
+                int iy = (int)(y * freq) & 255;
                 int idx = (ix * 31 + iy * 17 + o * 97) & 255;
-                v         += noise_table[idx] * amp;
+                v += noise_table[idx] * amp;
                 total_amp += amp;
                 amp  *= 0.5f;
                 freq *= 2.0f;
@@ -150,6 +158,10 @@ static Tile **alloc_tiles(int W, int H) {
     return tiles;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   CHEBYSHEV DISTANCE
+═══════════════════════════════════════════════════════════ */
+
 static int chebyshev(int ax, int ay, int bx, int by) {
     int dx = ax - bx; if (dx < 0) dx = -dx;
     int dy = ay - by; if (dy < 0) dy = -dy;
@@ -167,11 +179,11 @@ void gen_map(GameState *gs) {
 
     gs->map.tiles = alloc_tiles(W, H);
 
-    /* ── 1. Height + moisture noise ─────────────────────── */
-    float *hmap = gen_heightmap(W, H, &rng);
-    float *mmap = gen_heightmap(W, H, &rng);
+    /* ── 1. Height + moisture noise ──────────────────────── */
+    float *hmap  = gen_heightmap(W, H, &rng);
+    float *mmap  = gen_heightmap(W, H, &rng); /* moisture */
 
-    /* ── 2. Classify terrain ────────────────────────────── */
+    /* ── 2. Classify terrain from height + moisture ──────── */
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
             float h = hmap[y * W + x];
@@ -191,16 +203,18 @@ void gen_map(GameState *gs) {
             gs->map.tiles[y][x].terrain = t;
         }
     }
+
     free(hmap);
     free(mmap);
 
-    /* ── 3. Pick starting plain tile (center-ish) ──────── */
+    /* ── 3. Pick starting plain tile (center-ish) ─────────── */
     int sx = W / 2, sy = H / 2;
+    /* Search outward in spiral until we find a PLAIN tile */
     for (int r = 0; r <= (W > H ? W : H); r++) {
         int found = 0;
         for (int dy = -r; dy <= r && !found; dy++) {
             for (int dx = -r; dx <= r && !found; dx++) {
-                if ((dx != -r && dx != r) && (dy != -r && dy != r)) continue;
+                if ((dx != -r && dx != r) && (dy != -r && dy != r)) continue; /* only ring */
                 int nx = sx + dx, ny = sy + dy;
                 if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
                 if (gs->map.tiles[ny][nx].terrain == TERRAIN_PLAIN) {
@@ -209,31 +223,38 @@ void gen_map(GameState *gs) {
             }
         }
         if (found) break;
+        /* if r=0 and center is plain, already done */
         if (r == 0 && gs->map.tiles[sy][sx].terrain == TERRAIN_PLAIN) break;
     }
+    /* Force to plain if nothing found */
     gs->map.tiles[sy][sx].terrain = TERRAIN_PLAIN;
 
-    /* ── 4. Place starting city ─────────────────────────── */
+    /* ── 4. Place starting city ──────────────────────────── */
     gs->next_city_id = 0;
-    City *start_city = city_create(gs, sx, sy, 0);
+    City *start_city = city_create(gs, sx, sy, 0 /* founded_turn */);
     (void)start_city;
 
-    /* ── 5. Place starting warrior ──────────────────────── */
+    /* ── 5. Place starting warrior on the city tile ──────── */
     gs->next_unit_id = 0;
     unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, sx, sy);
 
-    /* ── 6. Place barbarian camps ────────────────────────── */
+    /* ── 6. Place barbarian camps ─────────────────────────── */
     gs->next_camp_id = 0;
-    int placed = 0, attempts = 0;
+    int placed = 0;
+    int attempts = 0;
     while (placed < gs->n_barbarian_camps_initial && attempts < W * H * 4) {
         attempts++;
         int cx = gen_rand_range(&rng, 0, W - 1);
         int cy = gen_rand_range(&rng, 0, H - 1);
+        /* must be land, not water */
         if (gs->map.tiles[cy][cx].terrain == TERRAIN_WATER) continue;
+        /* must be > BARB_MIN_DIST_FROM_START from start */
         if (chebyshev(cx, cy, sx, sy) < BARB_MIN_DIST_FROM_START) continue;
+        /* must not already have a camp or city */
         if (gs->map.tiles[cy][cx].camp_id != -1) continue;
         if (gs->map.tiles[cy][cx].city_id != -1) continue;
 
+        /* allocate camp */
         Camp *c = malloc(sizeof(Camp));
         if (!c) { perror("malloc"); exit(1); }
         c->id    = gs->next_camp_id++;
