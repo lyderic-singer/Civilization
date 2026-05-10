@@ -6,7 +6,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "core.h"
+#include "../core/core.h"
 #include "cli.h"
 
 /* Free all dynamic memory in gs */

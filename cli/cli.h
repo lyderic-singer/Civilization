@@ -6,7 +6,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "core.h"
+#include "../core/core.h"
 
 void cli_print_map(GameState *gs);
 void cli_print_status(GameState *gs);
