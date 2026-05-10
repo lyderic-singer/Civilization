@@ -1,4 +1,4 @@
-#include "cli/game.h"
+#include "cli/cli.h"
 
 static void print_usage(const char *prog) {
     printf("Usage: %s [options]\n", prog);
