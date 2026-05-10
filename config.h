@@ -145,6 +145,6 @@
 #define SCORE_TURN_BONUS      10
 
 /* ==== Seed hash display width (characters = 40 hex digits, like ETH addr) ==== */
-#define SEED_HEX_LEN 40
+#define SEED_HEX_LEN 16
 
 #endif /* CONFIG_H */

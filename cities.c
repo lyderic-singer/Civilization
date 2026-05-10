@@ -126,16 +126,6 @@ int city_total_pop(GameState *gs) {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   CHEBYSHEV  (local copy to avoid circular include)
-═══════════════════════════════════════════════════════════ */
-
-static int cheb(int ax, int ay, int bx, int by) {
-    int dx = ax - bx; if (dx < 0) dx = -dx;
-    int dy = ay - by; if (dy < 0) dy = -dy;
-    return dx > dy ? dx : dy;
-}
-
-/* ═══════════════════════════════════════════════════════════
    TERRAIN INFO  (local table mirror)
 ═══════════════════════════════════════════════════════════ */
 
@@ -168,7 +158,7 @@ void cities_compute_yields(GameState *gs) {
             int   best_turn = 999999;
 
             for (City *c = gs->cities; c; c = c->next) {
-                int d = cheb(x, y, c->x, c->y);
+                int d = chebyshev(x, y, c->x, c->y);
                 int r = city_exploit_radius(c->population);
                 if (d > r) continue;
                 if (d < best_dist || (d == best_dist && c->founded_turn < best_turn)) {

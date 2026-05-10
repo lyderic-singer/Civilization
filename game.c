@@ -31,7 +31,7 @@ static char terrain_char(TerrainType t) {
    INIT / FREE
 ═══════════════════════════════════════════════════════════ */
 
-GameState *game_init(int width, int height, int turns, int n_barb_camps, Seed seed) {
+GameState *gen_game(int width, int height, int turns, int n_barb_camps, Seed seed) {
     GameState *gs = calloc(1, sizeof(GameState));
     if (!gs) { perror("calloc"); exit(1); }
 
@@ -57,7 +57,7 @@ GameState *game_init(int width, int height, int turns, int n_barb_camps, Seed se
     gen_map(gs);
 
     printf("\n=== Early Civilization ===\n");
-    printf("Seed: 0x%s\n", gs->seed.hex);
+    printf("Seed: %s\n", gs->seed.hex);
     printf("Carte: %dx%d | Tours max: %d | Camps barbares: %d\n\n",
            width, height, turns, n_barb_camps);
 
@@ -686,18 +686,7 @@ int game_main(int argc, char **argv) {
         } else if ((strcmp(argv[i], "--mode") == 0 || strcmp(argv[i], "-m") == 0) && i+1 < argc) {
             i++; /* only 'cli' supported */
         } else if ((strcmp(argv[i], "--seed") == 0 || strcmp(argv[i], "-s") == 0) && i+1 < argc) {
-            i++;
-            const char *s = argv[i];
-            /* Try to detect hex string (contains letters or length > 10) */
-            int is_hex = 0;
-            for (const char *p = s; *p; p++) {
-                if (isalpha((unsigned char)*p)) { is_hex = 1; break; }
-            }
-            if (is_hex || strlen(s) > 10) {
-                seed = gen_seed_from_hex(s);
-            } else {
-                seed = gen_seed_from_u64((uint64_t)atoll(s));
-            }
+            seed = gen_seed(argv[++i]);
             has_seed = 1;
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             print_usage(argv[0]);
@@ -719,10 +708,8 @@ int game_main(int argc, char **argv) {
         return 1;
     }
     if (n_barbs < 0) n_barbs = 0;
-
     if (!has_seed) seed = gen_random_seed();
-
-    GameState *gs = game_init(width, height, turns, n_barbs, seed);
+    GameState *gs = gen_game(width, height, turns, n_barbs, seed);
     game_run(gs);
     game_free(gs);
     return 0;

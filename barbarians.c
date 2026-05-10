@@ -6,16 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* ═══════════════════════════════════════════════════════════
-   HELPERS
-═══════════════════════════════════════════════════════════ */
-
-static int chebyshev(int ax, int ay, int bx, int by) {
-    int dx = ax - bx; if (dx < 0) dx = -dx;
-    int dy = ay - by; if (dy < 0) dy = -dy;
-    return dx > dy ? dx : dy;
-}
-
 /* Find the nearest player unit OR city to (bx,by).
    Stores the target coords in *tx,*ty.
    Priority: unit before city when equidistant (deterministic tiebreak: smaller id).

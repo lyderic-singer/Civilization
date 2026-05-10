@@ -2,6 +2,7 @@
 #define CITIES_H
 
 #include "structs.h"
+#include "utils.h"
 
 /* ── Lifecycle ─────────────────────────────────────────────── */
 

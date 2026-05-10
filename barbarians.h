@@ -2,6 +2,7 @@
 #define BARBARIANS_H
 
 #include "structs.h"
+#include "utils.h"
 
 /* Execute the full barbarian phase for one turn:
    1. Spawn warriors from alive camps (if cap not reached)

@@ -159,8 +159,8 @@ typedef struct {
 ═══════════════════════════════════════════════════════════ */
 
 typedef struct {
-    uint64_t parts[3];   /* 192 bits total; we display 160 = 40 hex chars */
-    char     hex[SEED_HEX_LEN + 1]; /* human-readable */
+    uint64_t value;
+    char hex[SEED_HEX_LEN + 1];
 } Seed;
 
 /* ═══════════════════════════════════════════════════════════
