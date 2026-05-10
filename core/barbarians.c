@@ -1,56 +1,6 @@
 #include "barbarians.h"
 
-/* Find the nearest player unit OR city to (bx,by).
-   Stores the target coords in *tx,*ty.
-   Priority: unit before city when equidistant (deterministic tiebreak: smaller id).
-   Returns 1 if a target was found, 0 if the player has nothing left. */
-static int find_nearest_target(GameState *gs, int bx, int by, int *tx, int *ty) {
-    int best_dist = 999999;
-    int best_is_unit = 0; /* 1=unit, 0=city */
-    int best_id  = 999999;
-    int best_x   = -1, best_y = -1;
-
-    /* Player units */
-    for (Unit *u = gs->units; u; u = u->next) {
-        if (u->owner != UNIT_OWNER_PLAYER) continue;
-        int d = chebyshev(bx, by, u->x, u->y);
-        if (d < best_dist || (d == best_dist && (1 > best_is_unit || u->id < best_id))) {
-            best_dist    = d;
-            best_is_unit = 1;
-            best_id      = u->id;
-            best_x       = u->x;
-            best_y       = u->y;
-        }
-    }
-
-    /* Player cities */
-    for (City *c = gs->cities; c; c = c->next) {
-        int d = chebyshev(bx, by, c->x, c->y);
-        if (d < best_dist || (d == best_dist && !best_is_unit && c->id < best_id)) {
-            best_dist    = d;
-            best_is_unit = 0;
-            best_id      = c->id;
-            best_x       = c->x;
-            best_y       = c->y;
-        }
-    }
-
-    if (best_x == -1) return 0;
-    *tx = best_x;
-    *ty = best_y;
-    return 1;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   GREEDY MOVE TOWARD TARGET
-   Tries all 8 neighbours, picks the one that:
-   1. Is passable (move_cost > 0)
-   2. Is not occupied by another barb unit
-   3. Minimises Chebyshev distance to target
-   4. Tiebreak: smallest (dx,dy) lexicographically (deterministic)
-═══════════════════════════════════════════════════════════ */
-
-static const int TERRAIN_COSTS[TERRAIN_COUNT] = {
+const int TERRAIN_COSTS[TERRAIN_COUNT] = {
     TERRAIN_PLAIN_COST,
     TERRAIN_FOREST_COST,
     TERRAIN_MOUNTAIN_COST,
@@ -59,57 +9,69 @@ static const int TERRAIN_COSTS[TERRAIN_COUNT] = {
     TERRAIN_TUNDRA_COST
 };
 
-static void barb_move_toward(GameState *gs, Unit *barb, int tx, int ty) {
+int find_nearest_target(GameState *gs, int bx, int by, int *tx, int *ty) {
+    int best_dist = 999999;
+    int best_is_unit = 0; /* 1=unit, 0=city */
+    int best_id = 999999;
+    int best_x = -1, best_y = -1;
+    for (Unit *u = gs->units; u; u = u->next) {
+        if (u->owner != UNIT_OWNER_PLAYER) continue;
+        int d = chebyshev(bx, by, u->x, u->y);
+        if (d < best_dist || (d == best_dist && (1 > best_is_unit || u->id < best_id))) {
+            best_dist = d;
+            best_is_unit = 1;
+            best_id = u->id;
+            best_x = u->x;
+            best_y = u->y;
+    }}
+    for (City *c = gs->cities; c; c = c->next) {
+        int d = chebyshev(bx, by, c->x, c->y);
+        if (d < best_dist || (d == best_dist && !best_is_unit && c->id < best_id)) {
+            best_dist = d;
+            best_is_unit = 0;
+            best_id = c->id;
+            best_x = c->x;
+            best_y = c->y;
+    }}
+    if (best_x == -1) return 0;
+    *tx = best_x;
+    *ty = best_y;
+    return 1;
+}
+
+int barb_best_step(GameState *gs, Unit *barb, int tx, int ty, int *out_dx, int *out_dy) {
     int best_dx = 0, best_dy = 0;
     int best_dist = chebyshev(barb->x, barb->y, tx, ty);
     int best_cost = 999;
-
     for (int dy = -1; dy <= 1; dy++) {
         for (int dx = -1; dx <= 1; dx++) {
             if (dx == 0 && dy == 0) continue;
-            int nx = barb->x + dx;
-            int ny = barb->y + dy;
+            int nx = barb->x + dx, ny = barb->y + dy;
             if (nx < 0 || nx >= gs->map.width || ny < 0 || ny >= gs->map.height) continue;
-
-            /* Check terrain passability */
-            TerrainType t = gs->map.tiles[ny][nx].terrain;
-            int cost = TERRAIN_COSTS[t];
-            if (cost == 0) continue; /* water */
-            if (cost > barb->pm_left) continue; /* not enough PM */
-
-            /* Check if occupied by another barb (don't stack barbs) */
+            int cost = TERRAIN_COSTS[gs->map.tiles[ny][nx].terrain];
+            if (cost == 0 || cost > barb->pm_left) continue;
             Unit *occ = unit_at(gs, nx, ny, UNIT_OWNER_BARB);
             if (occ && occ->id != barb->id) continue;
-
             int d = chebyshev(nx, ny, tx, ty);
-            /* Accept if closer to target, or same dist with lower cost, or lex smaller */
-            if (d < best_dist ||
-                (d == best_dist && cost < best_cost) ||
+            if (d < best_dist || (d == best_dist && cost < best_cost) ||
                 (d == best_dist && cost == best_cost && (dy < best_dy || (dy == best_dy && dx < best_dx)))) {
-                best_dist = d;
-                best_cost = cost;
-                best_dx   = dx;
-                best_dy   = dy;
-            }
-        }
-    }
+                best_dist = d; best_cost = cost; best_dx = dx; best_dy = dy;
+    }}}
+    *out_dx = best_dx; *out_dy = best_dy;
+    return best_dist;
+}
 
-    if (best_dist == chebyshev(barb->x, barb->y, tx, ty) && best_dx == 0 && best_dy == 0)
-        return; /* already at best reachable position */
-    if (best_dx == 0 && best_dy == 0) return; /* no improvement possible */
-
-    int nx = barb->x + best_dx;
-    int ny = barb->y + best_dy;
-
-    /* Check for player unit at destination ==> attack */
+void barb_move_toward(GameState *gs, Unit *barb, int tx, int ty) {
+    int dx, dy;
+    int best_dist = barb_best_step(gs, barb, tx, ty, &dx, &dy);
+    if (dx == 0 && dy == 0) return;
+    int nx = barb->x + dx, ny = barb->y + dy;
     Unit *player_unit = unit_at(gs, nx, ny, UNIT_OWNER_PLAYER);
     if (player_unit) {
         printf("[Barbare %d] Attaque unite joueur id=%d\n", barb->id, player_unit->id);
         unit_attack_unit(gs, barb, player_unit);
-        return; /* don't move after attack */
+        return;
     }
-
-    /* Check for player city at destination ==> attack city */
     int city_id = gs->map.tiles[ny][nx].city_id;
     if (city_id != -1) {
         City *city = city_by_id(gs, city_id);
@@ -117,61 +79,39 @@ static void barb_move_toward(GameState *gs, Unit *barb, int tx, int ty) {
             printf("[Barbare %d] Attaque ville id=%d\n", barb->id, city_id);
             unit_attack_city(gs, barb, city);
             return;
-        }
-    }
-
-    /* Move */
-    barb->pm_left -= best_cost;
+    }}
+    barb->pm_left -= TERRAIN_COSTS[gs->map.tiles[ny][nx].terrain];
     barb->x = nx;
     barb->y = ny;
+    (void)best_dist;
 }
-
-/* ═══════════════════════════════════════════════════════════
-   SPAWN
-═══════════════════════════════════════════════════════════ */
 
 void barbarians_spawn(GameState *gs) {
     int cap = gs->n_barbarian_camps_initial * BARB_UNIT_CAP_FACTOR;
     if (gs->barb_unit_count >= cap) return;
-
     for (Camp *camp = gs->camps; camp; camp = camp->next) {
         if (!camp->alive) continue;
         if (gs->barb_unit_count >= cap) break;
-
-        /* Only spawn if camp tile is free of any unit */
         if (unit_any_at(gs, camp->x, camp->y)) continue;
-
         unit_create(gs, UNIT_TYPE_BARB, UNIT_OWNER_BARB, camp->x, camp->y);
         printf("[Camp barbare %d] Spawn guerrier barbare\n", camp->id);
     }
 }
 
-/* ═══════════════════════════════════════════════════════════
-   MOVE AND ATTACK
-═══════════════════════════════════════════════════════════ */
-
 void barbarians_move_and_attack(GameState *gs) {
-    /* Iterate by snapshot: store IDs first, then process,
-       because units can be destroyed mid-loop */
     int barb_ids[256];
     int n_barbs = 0;
     for (Unit *u = gs->units; u; u = u->next) {
         if (u->owner == UNIT_OWNER_BARB && n_barbs < 256)
             barb_ids[n_barbs++] = u->id;
     }
-
     for (int i = 0; i < n_barbs; i++) {
         Unit *barb = unit_by_id(gs, barb_ids[i]);
-        if (!barb) continue; /* killed by a previous combat this turn */
-
-        barb->pm_left = barb->pm_max; /* barbs get full PM each phase */
-
+        if (!barb) continue;
+        barb->pm_left = barb->pm_max;
         int tx, ty;
         if (!find_nearest_target(gs, barb->x, barb->y, &tx, &ty)) continue;
-
         int dist = chebyshev(barb->x, barb->y, tx, ty);
-
-        /* If already adjacent ==> attack immediately */
         if (dist == 1) {
             Unit *player_unit = unit_at(gs, tx, ty, UNIT_OWNER_PLAYER);
             if (player_unit) {
@@ -186,26 +126,15 @@ void barbarians_move_and_attack(GameState *gs) {
                     printf("[Barbare %d] Attaque directe ville id=%d\n", barb->id, cid);
                     unit_attack_city(gs, barb, city);
                     continue;
-                }
-            }
-        }
-
-        /* Spend PM to move toward target */
+        }}}
         while (barb->pm_left > 0) {
             int old_x = barb->x, old_y = barb->y;
             barb_move_toward(gs, barb, tx, ty);
-            /* Stop if barb was destroyed (attacked) or didn't move */
             if (!unit_by_id(gs, barb_ids[i])) break;
             if (barb->x == old_x && barb->y == old_y) break;
-            /* Recheck adjacency after each step */
             if (chebyshev(barb->x, barb->y, tx, ty) <= 1) break;
-        }
-    }
+    }}
 }
-
-/* ═══════════════════════════════════════════════════════════
-   FULL BARBARIAN PHASE
-═══════════════════════════════════════════════════════════ */
 
 void barbarians_turn(GameState *gs) {
     barbarians_spawn(gs);

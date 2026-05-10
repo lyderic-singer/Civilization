@@ -96,6 +96,7 @@
 #define BUILDING_WALL_COST          80
 #define BUILDING_WALL_MAINT         2
 
+#define BUILDING_COUNT 6
 /* ==== Units ==== */
 #define UNIT_SETTLER_COST    50
 #define UNIT_SETTLER_MAINT   0
