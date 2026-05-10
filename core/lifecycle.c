@@ -28,16 +28,16 @@ Map gen_map(int W, int H, Seed seed) {
             float m = mmap[y * W + x];
             TerrainType t;
             if (h < 0.28f) {
-                t = TERRAIN_WATER;
-            } else if (h < 0.40f) {
-                t = (m > 0.55f) ? TERRAIN_TUNDRA : TERRAIN_DESERT;
-            } else if (h < 0.60f) {
-                t = (m > 0.50f) ? TERRAIN_FOREST : TERRAIN_PLAIN;
-            } else if (h < 0.80f) {
-                t = (m > 0.45f) ? TERRAIN_FOREST : TERRAIN_PLAIN;
-            } else {
-                t = TERRAIN_MOUNTAIN;
-            }
+    t = TERRAIN_WATER;
+} else if (h < 0.40f) {
+    t = (m > 0.60f) ? TERRAIN_TUNDRA : TERRAIN_DESERT;
+} else if (h < 0.60f) {
+    t = (m > 0.60f) ? TERRAIN_FOREST : TERRAIN_PLAIN;
+} else if (h < 0.80f) {
+    t = (m > 0.55f) ? TERRAIN_FOREST : TERRAIN_PLAIN;
+} else {
+    t = TERRAIN_MOUNTAIN;
+}
             map.tiles[y][x].terrain = t;
     }}
     free(hmap);
