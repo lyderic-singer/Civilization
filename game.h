@@ -1,17 +1,21 @@
 #ifndef GAME_H
 #define GAME_H
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
 #include "structs.h"
-
-/* ── Init / teardown ───────────────────────────────────────── */
-
-/* Allocate and initialise a GameState from CLI arguments.
-   Calls gen_map internally. */
-GameState *game_init(int width, int height, int turns, int n_barb_camps,
-                     Seed seed);
+#include "gen.h"
+#include "units.h"
+#include "cities.h"
+#include "barbarians.h"
+#include "tech.h"
+#include "config.h"
 
 /* Free all dynamic memory in gs */
-void game_free(GameState *gs);
+void free_game(GameState *gs);
 
 /* ── Main loop ─────────────────────────────────────────────── */
 
@@ -63,4 +67,4 @@ int game_settler_colonise(GameState *gs, Unit *settler);
 /* Parse argc/argv, run the game, return exit code */
 int game_main(int argc, char **argv);
 
-#endif /* GAME_H */
+#endif

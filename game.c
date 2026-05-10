@@ -1,19 +1,5 @@
+
 #include "game.h"
-#include "gen.h"
-#include "units.h"
-#include "cities.h"
-#include "barbarians.h"
-#include "tech.h"
-#include "config.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-
-/* ═══════════════════════════════════════════════════════════
-   TERRAIN DISPLAY
-═══════════════════════════════════════════════════════════ */
 
 static char terrain_char(TerrainType t) {
     switch (t) {
@@ -43,7 +29,7 @@ static void free_map(Map *m) {
     m->tiles = NULL;
 }
 
-void game_free(GameState *gs) {
+void free_game(GameState *gs) {
     free_units(gs->units);
     free_cities(gs->cities);
     free_camps(gs->camps);
@@ -455,7 +441,7 @@ void game_phase_action(GameState *gs) {
             printf("Au revoir.\n");
             game_compute_score(gs);
             cli_print_result(gs);
-            game_free(gs);
+            free_game(gs);
             exit(0);
         }
 
@@ -674,7 +660,7 @@ int game_main(int argc, char **argv) {
     if (!has_seed) seed = gen_random_seed();
     GameState *gs = gen_game(width, height, turns, n_barbs, seed);
     game_run(gs);
-    game_free(gs);
+    free_game(gs);
     return 0;
 }
 

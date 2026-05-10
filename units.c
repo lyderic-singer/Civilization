@@ -1,14 +1,4 @@
 #include "units.h"
-#include "cities.h"
-#include "config.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-/* ═══════════════════════════════════════════════════════════
-   STAT TABLES
-═══════════════════════════════════════════════════════════ */
 
 static const int UNIT_COSTS[3]    = {UNIT_SETTLER_COST,    UNIT_WARRIOR_COST,    UNIT_WARRIOR_COST};
 static const int UNIT_MAINTS[3]   = {UNIT_SETTLER_MAINT,   UNIT_WARRIOR_MAINT,   UNIT_WARRIOR_MAINT};

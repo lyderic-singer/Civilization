@@ -1,23 +1,4 @@
 #include "tech.h"
-#include "units.h"
-#include "config.h"
-
-#include <stdio.h>
-#include <string.h>
-
-/* ═══════════════════════════════════════════════════════════
-   TECH DEFINITIONS  (matches config.h TECH_ID_* constants)
-
-   Graph (DAG):
-     Hunting    ← Depart
-     Farming    ← Depart
-     Irrigation ← Farming
-     Craft      ← Depart
-     Masonry    ← Craft
-     Writing    ← Depart
-     Commerce   ← Craft + Writing
-     Riding     ← Depart
-═══════════════════════════════════════════════════════════ */
 
 static const TechDef TECH_DEFS[TECH_COUNT] = {
     /* TECH_ID_HUNTING = 0 */

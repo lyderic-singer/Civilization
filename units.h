@@ -1,7 +1,13 @@
 #ifndef UNITS_H
 #define UNITS_H
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "structs.h"
+#include "cities.h"
+#include "config.h"
 
 /* ── Lifecycle ─────────────────────────────────────────────── */
 
