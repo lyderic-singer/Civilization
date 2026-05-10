@@ -6,13 +6,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "structs.h"
-#include "gen.h"
-#include "units.h"
-#include "cities.h"
-#include "barbarians.h"
-#include "tech.h"
-#include "config.h"
+#include "core.h"
 
 /* Free all dynamic memory in gs */
 void free_game(GameState *gs);
