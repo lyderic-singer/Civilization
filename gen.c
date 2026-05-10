@@ -1,14 +1,4 @@
 #include "gen.h"
-#include "config.h"
-#include "structs.h"
-#include "units.h"
-#include "cities.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <stdint.h>
 
 void compute_hex(Seed *s) {
     static const char *h = "0123456789abcdef";
@@ -97,11 +87,12 @@ Tile **alloc_tiles(int W, int H) {
     return tiles;
 }
 
-void gen_map(GameState *gs) {
-    int W = gs->map.width;
-    int H = gs->map.height;
-    gs->map.tiles = alloc_tiles(W, H);
-    uint64_t rng = mix(mix(gs->seed.value));
+Map gen_map(int W, int H, Seed seed) {
+    Map map;
+    map.width  = W;
+    map.height = H;
+    map.tiles  = alloc_tiles(W, H);
+    uint64_t rng = mix(mix(seed.value));
     float *hmap  = gen_heightmap(W, H, rng);
     float *mmap  = gen_heightmap(W, H, mix(rng));
     for (int y = 0; y < H; y++) {
@@ -120,13 +111,19 @@ void gen_map(GameState *gs) {
             } else {
                 t = TERRAIN_MOUNTAIN;
             }
-            gs->map.tiles[y][x].terrain = t;
+            map.tiles[y][x].terrain = t;
         }
     }
     free(hmap);
     free(mmap);
+    return map;
+}
 
+void gen_first_city(GameState *gs) {
+    int W = gs->map.width;
+    int H = gs->map.height;
     int sx = W / 2, sy = H / 2;
+
     for (int r = 0; r <= (W > H ? W : H); r++) {
         int found = 0;
         for (int dy = -r; dy <= r && !found; dy++) {
@@ -136,42 +133,34 @@ void gen_map(GameState *gs) {
                 if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
                 if (gs->map.tiles[ny][nx].terrain == TERRAIN_PLAIN) {
                     sx = nx; sy = ny; found = 1;
-                }
-            }
-        }
+        }}}
         if (found) break;
-        /* if r=0 and center is plain, already done */
         if (r == 0 && gs->map.tiles[sy][sx].terrain == TERRAIN_PLAIN) break;
     }
-    /* Force to plain if nothing found */
     gs->map.tiles[sy][sx].terrain = TERRAIN_PLAIN;
-
-    /* ── 4. Place starting city ──────────────────────────── */
     gs->next_city_id = 0;
-    City *start_city = city_create(gs, sx, sy, 0 /* founded_turn */);
+    City *start_city = city_create(gs, sx, sy, 0);
     (void)start_city;
-
-    /* ── 5. Place starting warrior on the city tile ──────── */
     gs->next_unit_id = 0;
     unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, sx, sy);
+}
 
-    /* ── 6. Place barbarian camps ─────────────────────────── */
+void gen_camps(GameState *gs, int n) {
+    int W = gs->map.width;
+    int H = gs->map.height;
+    uint64_t rng = mix(mix(mix(gs->seed.value))); /* décalage identique à l'original */
+    int sx = gs->cities->x;
+    int sy = gs->cities->y;
     gs->next_camp_id = 0;
-    int placed = 0;
-    int attempts = 0;
-    while (placed < gs->n_barbarian_camps_initial && attempts < W * H * 4) {
+    int placed = 0, attempts = 0;
+    while (placed < n && attempts < W * H * 4) {
         attempts++;
         int cx = gen_rand_range(rng, 0, W - 1);
         int cy = gen_rand_range(rng, 0, H - 1);
-        /* must be land, not water */
         if (gs->map.tiles[cy][cx].terrain == TERRAIN_WATER) continue;
-        /* must be > BARB_MIN_DIST_FROM_START from start */
         if (chebyshev(cx, cy, sx, sy) < BARB_MIN_DIST_FROM_START) continue;
-        /* must not already have a camp or city */
         if (gs->map.tiles[cy][cx].camp_id != -1) continue;
         if (gs->map.tiles[cy][cx].city_id != -1) continue;
-
-        /* allocate camp */
         Camp *c = malloc(sizeof(Camp));
         if (!c) { perror("malloc"); exit(1); }
         c->id    = gs->next_camp_id++;
@@ -185,7 +174,32 @@ void gen_map(GameState *gs) {
     }
 }
 
-Map gen_map(int W, int H, Seed seed);
-void gen_first_city(GameState *gs);
-void gen_camps(GameState *gs, int n);
-GameState *gen_game(int width, int height, int turns, int n_barb_camps, Seed seed);
+GameState *gen_game(int width, int height, int turns, int n_barb_camps, Seed seed) {
+    GameState *gs = calloc(1, sizeof(GameState));
+    if (!gs) { perror("calloc"); exit(1); }
+    gs->map.width  = width;
+    gs->map.height = height;
+    gs->turn       = 1;
+    gs->turn_max   = turns;
+    gs->n_barbarian_camps_initial = n_barb_camps;
+    gs->n_camps_destroyed = 0;
+    gs->barb_unit_count   = 0;
+    gs->gold              = 0;
+    gs->territorial_consecutive_turns = 0;
+    gs->zero_prod_turns   = 0;
+    gs->result            = RESULT_ONGOING;
+    gs->next_unit_id      = 0;
+    gs->next_city_id      = 0;
+    gs->next_camp_id      = 0;
+    gs->seed              = seed;
+    tech_init(&gs->tech);
+    tech_apply_effects(gs);
+    gs->map = gen_map(width, height, seed);
+    gen_first_city(gs);
+    gen_camps(gs, n_barb_camps);
+    printf("\n=== Early Civilization ===\n");
+    printf("Seed: %s\n", gs->seed.hex);
+    printf("Carte: %dx%d | Tours max: %d | Camps barbares: %d\n\n",
+           width, height, turns, n_barb_camps);
+    return gs;
+}

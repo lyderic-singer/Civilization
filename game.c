@@ -27,43 +27,6 @@ static char terrain_char(TerrainType t) {
     }
 }
 
-/* ═══════════════════════════════════════════════════════════
-   INIT / FREE
-═══════════════════════════════════════════════════════════ */
-
-GameState *gen_game(int width, int height, int turns, int n_barb_camps, Seed seed) {
-    GameState *gs = calloc(1, sizeof(GameState));
-    if (!gs) { perror("calloc"); exit(1); }
-
-    gs->map.width  = width;
-    gs->map.height = height;
-    gs->turn       = 1;
-    gs->turn_max   = turns;
-    gs->n_barbarian_camps_initial = n_barb_camps;
-    gs->n_camps_destroyed = 0;
-    gs->barb_unit_count   = 0;
-    gs->gold              = 0;
-    gs->territorial_consecutive_turns = 0;
-    gs->zero_prod_turns   = 0;
-    gs->result            = RESULT_ONGOING;
-    gs->next_unit_id      = 0;
-    gs->next_city_id      = 0;
-    gs->next_camp_id      = 0;
-    gs->seed              = seed;
-
-    tech_init(&gs->tech);
-    tech_apply_effects(gs); /* zero everything out cleanly */
-
-    gen_map(gs);
-
-    printf("\n=== Early Civilization ===\n");
-    printf("Seed: %s\n", gs->seed.hex);
-    printf("Carte: %dx%d | Tours max: %d | Camps barbares: %d\n\n",
-           width, height, turns, n_barb_camps);
-
-    return gs;
-}
-
 static void free_units(Unit *u) {
     while (u) { Unit *n = u->next; free(u); u = n; }
 }
