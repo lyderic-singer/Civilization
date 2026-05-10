@@ -1,12 +1,7 @@
 #ifndef TECH_H
 #define TECH_H
 
-#include <stdio.h>
-#include <string.h>
-
-#include "structs.h"
-#include "units.h"
-#include "config.h"
+#include "core.h"
 
 /* Get the static definition of a technology */
 const TechDef *tech_def(int tech_id);

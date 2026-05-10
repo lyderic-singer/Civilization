@@ -1,16 +1,7 @@
 #ifndef CITIES_H
 #define CITIES_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-
-#include "structs.h"
-#include "utils.h"
-#include "cities.h"
-#include "units.h"
-#include "config.h"
+#include "core.h"
 
 /* create city and set tule */
 City *city_create(GameState *gs, int x, int y, int founded_turn);

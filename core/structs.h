@@ -1,8 +1,7 @@
 #ifndef STRUCTS_H
 #define STRUCTS_H
 
-#include <stdint.h>
-#include "config.h"
+#include "core.h"
 
 /* ═══════════════════════════════════════════════════════════
    TERRAIN

@@ -1,6 +1,13 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+/* project libs imports */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <stdint.h>
+
 /* ==== Default parameters ==== */
 #define DEFAULT_WIDTH       50
 #define DEFAULT_HEIGHT      30
