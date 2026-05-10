@@ -3,6 +3,7 @@
 
 #include "../config.h"
 #include "structs.h"
+#include "utils.h"
 #include "gen.h"
 #include "units.h"
 #include "cities.h"

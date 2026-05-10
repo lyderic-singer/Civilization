@@ -1,46 +1,6 @@
 
 #include "game.h"
 
-static char terrain_char(TerrainType t) {
-    switch (t) {
-        case TERRAIN_PLAIN:    return 'P';
-        case TERRAIN_FOREST:   return 'F';
-        case TERRAIN_MOUNTAIN: return 'M';
-        case TERRAIN_WATER:    return '~';
-        case TERRAIN_DESERT:   return 'D';
-        case TERRAIN_TUNDRA:   return 'T';
-        default:               return '?';
-    }
-}
-
-static void free_units(Unit *u) {
-    while (u) { Unit *n = u->next; free(u); u = n; }
-}
-static void free_cities(City *c) {
-    while (c) { City *n = c->next; free(c); c = n; }
-}
-static void free_camps(Camp *c) {
-    while (c) { Camp *n = c->next; free(c); c = n; }
-}
-static void free_map(Map *m) {
-    if (!m->tiles) return;
-    for (int y = 0; y < m->height; y++) free(m->tiles[y]);
-    free(m->tiles);
-    m->tiles = NULL;
-}
-
-void free_game(GameState *gs) {
-    free_units(gs->units);
-    free_cities(gs->cities);
-    free_camps(gs->camps);
-    free_map(&gs->map);
-    free(gs);
-}
-
-/* ═══════════════════════════════════════════════════════════
-   SETTLER COLONISE
-═══════════════════════════════════════════════════════════ */
-
 int game_settler_colonise(GameState *gs, Unit *settler) {
     if (settler->type != UNIT_TYPE_SETTLER || settler->owner != UNIT_OWNER_PLAYER) {
         printf("Seul un Colon peut coloniser.\n");
@@ -94,17 +54,11 @@ static const int MOVE_COSTS[TERRAIN_COUNT] = {
     TERRAIN_WATER_COST, TERRAIN_DESERT_COST, TERRAIN_TUNDRA_COST
 };
 
-static int cheb(int ax, int ay, int bx, int by) {
-    int dx = ax - bx; if (dx < 0) dx = -dx;
-    int dy = ay - by; if (dy < 0) dy = -dy;
-    return dx > dy ? dx : dy;
-}
-
 static void unit_goto(GameState *gs, Unit *u, int tx, int ty) {
     while (u->pm_left > 0) {
         if (u->x == tx && u->y == ty) break;
         int best_dx = 0, best_dy = 0;
-        int best_d = cheb(u->x, u->y, tx, ty);
+        int best_d = chebyshev(u->x, u->y, tx, ty);
         int best_cost = 999;
 
         for (int dy = -1; dy <= 1; dy++) {
@@ -118,7 +72,7 @@ static void unit_goto(GameState *gs, Unit *u, int tx, int ty) {
                 /* Don't walk onto friendly units */
                 Unit *occ = unit_at(gs, nx, ny, UNIT_OWNER_PLAYER);
                 if (occ && occ->id != u->id) continue;
-                int d = cheb(nx, ny, tx, ty);
+                int d = chebyshev(nx, ny, tx, ty);
                 if (d < best_d || (d == best_d && cost < best_cost)) {
                     best_d = d; best_cost = cost;
                     best_dx = dx; best_dy = dy;

@@ -205,3 +205,30 @@ GameState *gen_game(int width, int height, int turns, int n_barb_camps, Seed see
     printf("Carte: %dx%d | Tours max: %d | Camps barbares: %d\n\n", width, height, turns, n_barb_camps);
     return gs;
 }
+
+void free_units(Unit *u) {
+    while (u) { Unit *n = u->next; free(u); u = n; }
+}
+
+void free_cities(City *c) {
+    while (c) { City *n = c->next; free(c); c = n; }
+}
+
+void free_camps(Camp *c) {
+    while (c) { Camp *n = c->next; free(c); c = n; }
+}
+
+void free_map(Map *m) {
+    if (!m->tiles) return;
+    for (int y = 0; y < m->height; y++) free(m->tiles[y]);
+    free(m->tiles);
+    m->tiles = NULL;
+}
+
+void free_game(GameState *gs) {
+    free_units(gs->units);
+    free_cities(gs->cities);
+    free_camps(gs->camps);
+    free_map(&gs->map);
+    free(gs);
+}
