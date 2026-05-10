@@ -1,15 +1,4 @@
 #include "cities.h"
-#include "units.h"
-#include "config.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-
-/* ═══════════════════════════════════════════════════════════
-   BUILDING TABLES
-═══════════════════════════════════════════════════════════ */
 
 typedef struct {
     int         flag;

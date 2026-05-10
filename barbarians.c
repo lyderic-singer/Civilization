@@ -1,10 +1,4 @@
 #include "barbarians.h"
-#include "units.h"
-#include "cities.h"
-#include "config.h"
-
-#include <stdio.h>
-#include <stdlib.h>
 
 /* Find the nearest player unit OR city to (bx,by).
    Stores the target coords in *tx,*ty.

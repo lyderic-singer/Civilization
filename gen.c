@@ -146,14 +146,16 @@ void gen_first_city(GameState *gs) {
 void gen_camps(GameState *gs, int n) {
     int W = gs->map.width;
     int H = gs->map.height;
-    uint64_t rng = mix(mix(mix(gs->seed.value))); /* décalage identique à l'original */
+    uint64_t rng = mix(mix(gs->seed.value));
     int sx = gs->cities->x;
     int sy = gs->cities->y;
     gs->next_camp_id = 0;
     int placed = 0, attempts = 0;
     while (placed < n && attempts < W * H * 4) {
         attempts++;
+        rng = mix(rng);
         int cx = gen_rand_range(rng, 0, W - 1);
+        rng = mix(rng);
         int cy = gen_rand_range(rng, 0, H - 1);
         if (gs->map.tiles[cy][cx].terrain == TERRAIN_WATER) continue;
         if (chebyshev(cx, cy, sx, sy) < BARB_MIN_DIST_FROM_START) continue;

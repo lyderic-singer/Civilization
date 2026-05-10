@@ -17,12 +17,12 @@
 
 static char terrain_char(TerrainType t) {
     switch (t) {
-        case TERRAIN_PLAIN:    return '.';
-        case TERRAIN_FOREST:   return 'T';
+        case TERRAIN_PLAIN:    return 'P';
+        case TERRAIN_FOREST:   return 'F';
         case TERRAIN_MOUNTAIN: return 'M';
         case TERRAIN_WATER:    return '~';
         case TERRAIN_DESERT:   return 'D';
-        case TERRAIN_TUNDRA:   return '_';
+        case TERRAIN_TUNDRA:   return 'T';
         default:               return '?';
     }
 }
@@ -97,7 +97,7 @@ void cli_print_map(GameState *gs) {
         printf("\n");
     }
 
-    printf("\nLegende: .=Plaine T=Foret M=Montagne ~=Eau D=Desert _=Toundra\n");
+    printf("\nLegende: P=Plaine F=Foret M=Montagne ~=Eau D=Desert T=Toundra\n");
     printf("         C=Ville S=Colon W=Guerrier b=Barbare X=Camp barbare\n\n");
 }
 
