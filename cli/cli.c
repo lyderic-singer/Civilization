@@ -1,6 +1,11 @@
 
 #include "cli.h"
 
+const int MOVE_COSTS[TERRAIN_COUNT] = {
+    TERRAIN_PLAIN_COST, TERRAIN_FOREST_COST, TERRAIN_MOUNTAIN_COST,
+    TERRAIN_WATER_COST, TERRAIN_DESERT_COST, TERRAIN_TUNDRA_COST
+};
+
 int game_settler_colonise(GameState *gs, Unit *settler) {
     if (settler->type != UNIT_TYPE_SETTLER || settler->owner != UNIT_OWNER_PLAYER) {
         printf("Seul un Colon peut coloniser.\n");
@@ -24,19 +29,13 @@ int game_settler_colonise(GameState *gs, Unit *settler) {
             printf("Trop proche d'une ville existante (distance Chebyshev: %d < %d).\n",
                    d, CITY_MIN_DISTANCE);
             return 0;
-        }
-    }
+    }}
     int sid = settler->id;
     unit_destroy(gs, sid);
     city_create(gs, x, y, gs->turn);
     printf("[Fondation] Nouvelle ville en (%d,%d)!\n", x, y);
     return 1;
 }
-
-const int MOVE_COSTS[TERRAIN_COUNT] = {
-    TERRAIN_PLAIN_COST, TERRAIN_FOREST_COST, TERRAIN_MOUNTAIN_COST,
-    TERRAIN_WATER_COST, TERRAIN_DESERT_COST, TERRAIN_TUNDRA_COST
-};
 
 void unit_goto(GameState *gs, Unit *u, int tx, int ty) {
     while (u->pm_left > 0) {

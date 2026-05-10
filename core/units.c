@@ -110,7 +110,7 @@ int unit_move(GameState *gs, Unit *u, int nx, int ny) {
     if (cost == 0) return 0; /* impassable (water) */
     if (u->pm_left < cost) return 0; /* not enough PM */
 
-    /* Check for enemy unit at destination → combat */
+    /* Check for enemy unit at destination ==> combat */
     Unit *enemy = unit_any_at(gs, nx, ny);
     if (enemy) {
         if (enemy->owner == u->owner) return 0; /* friendly blocking */
@@ -173,7 +173,7 @@ int unit_attack_unit(GameState *gs, Unit *attacker, Unit *defender) {
     defender->hp -= dmg_to_def;
     attacker->hp -= dmg_to_atk;
 
-    printf("[Combat] %s(%d) vs %s(%d) → -%d/-%d PV\n",
+    printf("[Combat] %s(%d) vs %s(%d) ==> -%d/-%d PV\n",
            unit_type_name(attacker->type), attacker->id,
            unit_type_name(defender->type), defender->id,
            dmg_to_def, dmg_to_atk);
@@ -207,7 +207,7 @@ int unit_attack_city(GameState *gs, Unit *attacker, City *city) {
     city->took_damage_this_turn = 1;
     attacker->hp -= dmg_to_unit;
 
-    printf("[Siege] %s attaque ville id=%d → ville -%d PV, unite -%d PV\n",
+    printf("[Siege] %s attaque ville id=%d ==> ville -%d PV, unite -%d PV\n",
            unit_type_name(attacker->type), city->id, dmg_to_city, dmg_to_unit);
 
     if (attacker->hp <= 0) {

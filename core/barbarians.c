@@ -101,7 +101,7 @@ static void barb_move_toward(GameState *gs, Unit *barb, int tx, int ty) {
     int nx = barb->x + best_dx;
     int ny = barb->y + best_dy;
 
-    /* Check for player unit at destination → attack */
+    /* Check for player unit at destination ==> attack */
     Unit *player_unit = unit_at(gs, nx, ny, UNIT_OWNER_PLAYER);
     if (player_unit) {
         printf("[Barbare %d] Attaque unite joueur id=%d\n", barb->id, player_unit->id);
@@ -109,7 +109,7 @@ static void barb_move_toward(GameState *gs, Unit *barb, int tx, int ty) {
         return; /* don't move after attack */
     }
 
-    /* Check for player city at destination → attack city */
+    /* Check for player city at destination ==> attack city */
     int city_id = gs->map.tiles[ny][nx].city_id;
     if (city_id != -1) {
         City *city = city_by_id(gs, city_id);
@@ -171,7 +171,7 @@ void barbarians_move_and_attack(GameState *gs) {
 
         int dist = chebyshev(barb->x, barb->y, tx, ty);
 
-        /* If already adjacent → attack immediately */
+        /* If already adjacent ==> attack immediately */
         if (dist == 1) {
             Unit *player_unit = unit_at(gs, tx, ty, UNIT_OWNER_PLAYER);
             if (player_unit) {
