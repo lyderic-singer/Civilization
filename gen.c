@@ -123,7 +123,6 @@ void gen_first_city(GameState *gs) {
     int W = gs->map.width;
     int H = gs->map.height;
     int sx = W / 2, sy = H / 2;
-
     for (int r = 0; r <= (W > H ? W : H); r++) {
         int found = 0;
         for (int dy = -r; dy <= r && !found; dy++) {
@@ -139,8 +138,7 @@ void gen_first_city(GameState *gs) {
     }
     gs->map.tiles[sy][sx].terrain = TERRAIN_PLAIN;
     gs->next_city_id = 0;
-    City *start_city = city_create(gs, sx, sy, 0);
-    (void)start_city;
+    city_create(gs, sx, sy, 0);
     gs->next_unit_id = 0;
     unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, sx, sy);
 }
