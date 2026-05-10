@@ -55,7 +55,7 @@
 #define TERRAIN_TUNDRA_SCI    0
 
 /* ==== City rules ==== */
-#define CITY_MIN_DISTANCE       4   /* Chebyshev distance between cities */
+#define CITY_MIN_DISTANCE       4
 #define CITY_START_POPULATION   1
 #define CITY_FOOD_CONSUMPTION_FACTOR 2   /* 2*pop per turn */
 #define CITY_GROWTH_BASE        20
@@ -134,7 +134,7 @@
 #define TECH_COST_RIDING     100
 
 /* ==== Barbarians ==== */
-#define BARB_MIN_DIST_FROM_START 5   /* Chebyshev distance */
+#define BARB_MIN_DIST_FROM_START 5
 #define BARB_UNIT_CAP_FACTOR     3   /* max = N_camps * 3 */
 #define BARB_GOLD_REWARD_FACTOR  5   /* reward = 5 * n_destroyed */
 
@@ -151,7 +151,7 @@
 #define SCORE_CITY_WEIGHT     50
 #define SCORE_TURN_BONUS      10
 
-/* ==== Seed hash display width (characters = 40 hex digits, like ETH addr) ==== */
+/* ==== Seed hash display width ==== */
 #define SEED_HEX_LEN 16
 
-#endif /* CONFIG_H */
+#endif

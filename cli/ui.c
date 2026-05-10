@@ -15,14 +15,12 @@ static char terrain_char(TerrainType t) {
 void print_map(GameState *gs) {
     int W = gs->map.width;
     int H = gs->map.height;
-
     printf("   ");
     for (int x = 0; x < W; x++) {
         if (x % 10 == 0) printf("|");
         else              printf("%d", x % 10);
     }
     printf("\n");
-
     for (int y = 0; y < H; y++) {
         printf("%2d ", y);
         for (int x = 0; x < W; x++) {
@@ -30,7 +28,6 @@ void print_map(GameState *gs) {
             Unit *bu = unit_at(gs, x, y, UNIT_OWNER_BARB);
             int cid  = gs->map.tiles[y][x].city_id;
             int pid  = gs->map.tiles[y][x].camp_id;
-
             char ch;
             if (pu) {
                 ch = (pu->type == UNIT_TYPE_SETTLER) ? 'S' : 'W';
@@ -50,7 +47,6 @@ void print_map(GameState *gs) {
         }
         printf("\n");
     }
-
     printf("\nLegende: P=Plaine F=Foret M=Montagne ~=Eau D=Desert T=Toundra\n");
     printf("         C=Ville S=Colon W=Guerrier b=Barbare X=Camp barbare\n\n");
 }
