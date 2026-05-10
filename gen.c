@@ -12,14 +12,18 @@ void compute_hex(Seed *s) {
 
 Seed gen_seed(char *str) {
     Seed s;
+    uint64_t v;
     uint64_t hash = 14695981039346656037ULL;
-    if (str) {
-        while (*str) {
+    if (str && str[0] == '0' && str[1] == 'x' && strlen(str) == SEED_HEX_LEN + 2) {
+        v = strtoull(str + 2, NULL, 16);
+    } else {
+        while (str && *str) {
             hash ^= (uint8_t)*str++;
             hash *= 1099511628211ULL;
         }
+        v = hash;
     }
-    s.value = hash;
+    s.value = v;
     compute_hex(&s);
     return s;
 }
@@ -89,12 +93,12 @@ Tile **alloc_tiles(int W, int H) {
 
 Map gen_map(int W, int H, Seed seed) {
     Map map;
-    map.width  = W;
+    map.width = W;
     map.height = H;
-    map.tiles  = alloc_tiles(W, H);
+    map.tiles = alloc_tiles(W, H);
     uint64_t rng = mix(mix(seed.value));
-    float *hmap  = gen_heightmap(W, H, rng);
-    float *mmap  = gen_heightmap(W, H, mix(rng));
+    float *hmap = gen_heightmap(W, H, rng);
+    float *mmap = gen_heightmap(W, H, mix(rng));
     for (int y = 0; y < H; y++) {
         for (int x = 0; x < W; x++) {
             float h = hmap[y * W + x];
@@ -112,8 +116,7 @@ Map gen_map(int W, int H, Seed seed) {
                 t = TERRAIN_MOUNTAIN;
             }
             map.tiles[y][x].terrain = t;
-        }
-    }
+    }}
     free(hmap);
     free(mmap);
     return map;
@@ -163,11 +166,11 @@ void gen_camps(GameState *gs, int n) {
         if (gs->map.tiles[cy][cx].city_id != -1) continue;
         Camp *c = malloc(sizeof(Camp));
         if (!c) { perror("malloc"); exit(1); }
-        c->id    = gs->next_camp_id++;
-        c->x     = cx;
-        c->y     = cy;
+        c->id = gs->next_camp_id++;
+        c->x = cx;
+        c->y = cy;
         c->alive = 1;
-        c->next  = gs->camps;
+        c->next = gs->camps;
         gs->camps = c;
         gs->map.tiles[cy][cx].camp_id = c->id;
         placed++;
@@ -177,29 +180,28 @@ void gen_camps(GameState *gs, int n) {
 GameState *gen_game(int width, int height, int turns, int n_barb_camps, Seed seed) {
     GameState *gs = calloc(1, sizeof(GameState));
     if (!gs) { perror("calloc"); exit(1); }
-    gs->map.width  = width;
+    gs->map.width = width;
     gs->map.height = height;
-    gs->turn       = 1;
-    gs->turn_max   = turns;
+    gs->turn = 1;
+    gs->turn_max = turns;
     gs->n_barbarian_camps_initial = n_barb_camps;
     gs->n_camps_destroyed = 0;
-    gs->barb_unit_count   = 0;
-    gs->gold              = 0;
+    gs->barb_unit_count = 0;
+    gs->gold = 0;
     gs->territorial_consecutive_turns = 0;
-    gs->zero_prod_turns   = 0;
-    gs->result            = RESULT_ONGOING;
-    gs->next_unit_id      = 0;
-    gs->next_city_id      = 0;
-    gs->next_camp_id      = 0;
-    gs->seed              = seed;
+    gs->zero_prod_turns = 0;
+    gs->result = RESULT_ONGOING;
+    gs->next_unit_id = 0;
+    gs->next_city_id = 0;
+    gs->next_camp_id = 0;
+    gs->seed = seed;
     tech_init(&gs->tech);
     tech_apply_effects(gs);
     gs->map = gen_map(width, height, seed);
     gen_first_city(gs);
     gen_camps(gs, n_barb_camps);
     printf("\n=== Early Civilization ===\n");
-    printf("Seed: %s\n", gs->seed.hex);
-    printf("Carte: %dx%d | Tours max: %d | Camps barbares: %d\n\n",
-           width, height, turns, n_barb_camps);
+    printf("Seed: 0x%s\n", gs->seed.hex);
+    printf("Carte: %dx%d | Tours max: %d | Camps barbares: %d\n\n", width, height, turns, n_barb_camps);
     return gs;
 }
