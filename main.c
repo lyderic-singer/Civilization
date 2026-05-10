@@ -11,7 +11,7 @@ static void print_usage(const char *prog) {
     printf("  --help\n");
 }
 
-int game_main(int argc, char **argv) {
+int main(int argc, char **argv) {
     int    width   = DEFAULT_WIDTH;
     int    height  = DEFAULT_HEIGHT;
     int    turns   = DEFAULT_TURNS;
@@ -56,8 +56,4 @@ int game_main(int argc, char **argv) {
     game_run(gs);
     free_game(gs);
     return 0;
-}
-
-int main(int argc, char **argv) {
-    return game_main(argc, argv);
 }

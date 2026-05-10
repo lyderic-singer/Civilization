@@ -1,6 +1,11 @@
 #ifndef CLI_H
 #define CLI_H
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
 #include "core.h"
 
 void cli_print_map(GameState *gs);
