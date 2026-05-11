@@ -1,6 +1,6 @@
 #include "ui.h"
 
-static char terrain_char(TerrainType t) {
+char terrain_char(TerrainType t) {
     switch (t) {
         case TERRAIN_PLAIN:    return 'P';
         case TERRAIN_FOREST:   return 'F';
@@ -107,7 +107,7 @@ void print_tech(GameState *gs) {
         const char *status;
         if (gs->tech.acquired[i])       status = "[OK]";
         else if (gs->tech.researching == i) {
-            static char buf[32];
+            char buf[32];
             snprintf(buf, sizeof buf, "[%d/%d]", gs->tech.science_stored, d->cost);
             status = buf;
         }
