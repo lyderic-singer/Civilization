@@ -1,5 +1,10 @@
 #include "utils.h"
 
+const int MOVE_COSTS[TERRAIN_COUNT] = {
+    TERRAIN_PLAIN_COST, TERRAIN_FOREST_COST, TERRAIN_MOUNTAIN_COST,
+    TERRAIN_WATER_COST, TERRAIN_DESERT_COST, TERRAIN_TUNDRA_COST
+};
+
 int chebyshev(int ax, int ay, int bx, int by) {
     int dx = ax - bx; if (dx < 0) dx = -dx;
     int dy = ay - by; if (dy < 0) dy = -dy;

@@ -139,6 +139,11 @@
 #define BARB_UNIT_CAP_FACTOR     3   /* max = N_camps * 3 */
 #define BARB_GOLD_REWARD_FACTOR  5   /* reward = 5 * n_destroyed */
 
+/* ==== Projects ==== */
+#define PROJECT_NONE     0
+#define PROJECT_UNIT     1
+#define PROJECT_BUILDING 2
+
 /* ==== Gold / bankruptcy ==== */
 #define GOLD_BANKRUPT_PROD_HALVE_TURNS 5
 

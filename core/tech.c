@@ -1,6 +1,6 @@
 #include "tech.h"
 
-static const TechDef TECH_DEFS[TECH_COUNT] = {
+const TechDef TECH_DEFS[TECH_COUNT] = {
 {.id = TECH_ID_HUNTING, .name = "Chasse", .cost = TECH_COST_HUNTING, .prereqs = { TECH_ID_NONE, TECH_ID_NONE, TECH_ID_NONE, TECH_ID_NONE }, .prereq_count = 0, .bonus_forest_food = 1 },
 {.id = TECH_ID_FARMING, .name = "Agriculture", .cost = TECH_COST_FARMING, .prereqs = { TECH_ID_NONE, TECH_ID_NONE, TECH_ID_NONE, TECH_ID_NONE }, .prereq_count = 0, .bonus_food_pct = 10 },
 {.id = TECH_ID_IRRIGATION, .name = "Irrigation", .cost = TECH_COST_IRRIGATION, .prereqs = { TECH_ID_FARMING, TECH_ID_NONE, TECH_ID_NONE, TECH_ID_NONE }, .prereq_count = 1, .bonus_food2_pct = 20 },

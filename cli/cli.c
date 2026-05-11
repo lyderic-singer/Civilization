@@ -1,11 +1,6 @@
 
 #include "cli.h"
 
-const int MOVE_COSTS[TERRAIN_COUNT] = {
-    TERRAIN_PLAIN_COST, TERRAIN_FOREST_COST, TERRAIN_MOUNTAIN_COST,
-    TERRAIN_WATER_COST, TERRAIN_DESERT_COST, TERRAIN_TUNDRA_COST
-};
-
 int game_settler_colonise(GameState *gs, Unit *settler) {
     if (settler->type != UNIT_TYPE_SETTLER || settler->owner != UNIT_OWNER_PLAYER) {
         printf("Seul un Colon peut coloniser.\n");
