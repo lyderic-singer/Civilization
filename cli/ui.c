@@ -2,13 +2,13 @@
 
 char terrain_char(TerrainType t) {
     switch (t) {
-        case TERRAIN_PLAIN:    return 'P';
-        case TERRAIN_FOREST:   return 'F';
+        case TERRAIN_PLAIN: return 'P';
+        case TERRAIN_FOREST: return 'F';
         case TERRAIN_MOUNTAIN: return 'M';
-        case TERRAIN_WATER:    return '~';
-        case TERRAIN_DESERT:   return 'D';
-        case TERRAIN_TUNDRA:   return 'T';
-        default:               return '?';
+        case TERRAIN_WATER: return '~';
+        case TERRAIN_DESERT: return 'D';
+        case TERRAIN_TUNDRA: return 'T';
+        default: return '?';
     }
 }
 
@@ -18,7 +18,7 @@ void print_map(GameState *gs) {
     printf("   ");
     for (int x = 0; x < W; x++) {
         if (x % 10 == 0) printf("|");
-        else              printf("%d", x % 10);
+        else printf("%d", x % 10);
     }
     printf("\n");
     for (int y = 0; y < H; y++) {
@@ -53,10 +53,10 @@ void print_map(GameState *gs) {
 
 void print_status(GameState *gs) {
     printf("--- Tour %d/%d --- Or: %d --- Science en cours: %d/%d (%s) ---\n",
-           gs->turn, gs->turn_max, gs->gold,
-           gs->tech.science_stored,
-           gs->tech.researching != TECH_ID_NONE ? tech_def(gs->tech.researching)->cost : 0,
-           gs->tech.researching != TECH_ID_NONE ? tech_name(gs->tech.researching) : "aucune");
+        gs->turn, gs->turn_max, gs->gold,
+        gs->tech.science_stored,
+        gs->tech.researching != TECH_ID_NONE ? tech_def(gs->tech.researching)->cost : 0,
+        gs->tech.researching != TECH_ID_NONE ? tech_name(gs->tech.researching) : "aucune");
 }
 
 void print_units(GameState *gs) {
@@ -65,8 +65,8 @@ void print_units(GameState *gs) {
     for (Unit *u = gs->units; u; u = u->next) {
         if (u->owner != UNIT_OWNER_PLAYER) continue;
         printf("  [%d] %s @ (%d,%d) PV:%d/%d ATK:%d DEF:%d PM:%d/%d\n",
-               u->id, unit_type_name(u->type), u->x, u->y,
-               u->hp, u->hp_max, u->attack, u->defense, u->pm_left, u->pm_max);
+            u->id, unit_type_name(u->type), u->x, u->y,
+            u->hp, u->hp_max, u->attack, u->defense, u->pm_left, u->pm_max);
         found = 1;
     }
     if (!found) printf("  (aucune unite)\n");
@@ -77,16 +77,16 @@ void print_cities(GameState *gs) {
     int found = 0;
     for (City *c = gs->cities; c; c = c->next) {
         printf("  [%d] @ (%d,%d) Pop:%d PV:%d/%d | Nourriture:%d Prod:%d Or:%d Sci:%d\n",
-               c->id, c->x, c->y, c->population, c->hp, c->hp_max,
-               c->yield_food, c->yield_prod, c->yield_gold, c->yield_science);
+            c->id, c->x, c->y, c->population, c->hp, c->hp_max,
+            c->yield_food, c->yield_prod, c->yield_gold, c->yield_science);
         printf("       Batiments: ");
         if (c->buildings == BUILDING_NONE) printf("aucun");
-        if (c->buildings & BUILDING_GRANARY)  printf("Grenier ");
+        if (c->buildings & BUILDING_GRANARY) printf("Grenier ");
         if (c->buildings & BUILDING_WORKSHOP) printf("Atelier ");
-        if (c->buildings & BUILDING_LIBRARY)  printf("Bibliotheque ");
-        if (c->buildings & BUILDING_MARKET)   printf("Marche ");
+        if (c->buildings & BUILDING_LIBRARY) printf("Bibliotheque ");
+        if (c->buildings & BUILDING_MARKET) printf("Marche ");
         if (c->buildings & BUILDING_BARRACKS) printf("Caserne ");
-        if (c->buildings & BUILDING_WALL)     printf("Muraille ");
+        if (c->buildings & BUILDING_WALL) printf("Muraille ");
         printf("\n");
         if (c->project_type != PROJECT_NONE) {
             const char *proj_name = (c->project_type == PROJECT_BUILDING)
@@ -105,16 +105,17 @@ void print_tech(GameState *gs) {
     for (int i = 0; i < TECH_COUNT; i++) {
         const TechDef *d = tech_def(i);
         const char *status;
-        if (gs->tech.acquired[i])       status = "[OK]";
+        if (gs->tech.acquired[i]) status = "[OK]";
         else if (gs->tech.researching == i) {
             char buf[32];
             snprintf(buf, sizeof buf, "[%d/%d]", gs->tech.science_stored, d->cost);
             status = buf;
         }
         else if (tech_available(&gs->tech, i)) status = "[dispo]";
-        else                                    status = "[verr.]";
-        printf("  %d. %-15s %s  (cout:%d)\n", i, d->name, status, d->cost);
-    }
+        else {
+            status = "[verr.]";
+            printf("  %d. %-15s %s  (cout:%d)\n", i, d->name, status, d->cost);
+    }}
 }
 
 void print_help(void) {
