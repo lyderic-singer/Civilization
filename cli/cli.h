@@ -3,6 +3,7 @@
 
 #include "../core/core.h"
 #include "ui.h"
+#include "../core/turn.h"
 
 void game_run(GameState *gs);
 

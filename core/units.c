@@ -173,3 +173,31 @@ void units_apply_pm_bonus(GameState *gs) {
             if (u->pm_left > u->pm_max) u->pm_left = u->pm_max;
     }}
 }
+
+void unit_goto(GameState *gs, Unit *u, int tx, int ty) {
+    while (u->pm_left > 0) {
+        if (u->x == tx && u->y == ty) break;
+        int best_dx = 0, best_dy = 0;
+        int best_d = chebyshev(u->x, u->y, tx, ty);
+        int best_cost = 999;
+        for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if (dx == 0 && dy == 0) continue;
+                int nx = u->x + dx, ny = u->y + dy;
+                if (nx < 0 || nx >= gs->map.width || ny < 0 || ny >= gs->map.height) continue;
+                TerrainType t = gs->map.tiles[ny][nx].terrain;
+                int cost = MOVE_COSTS[t];
+                if (cost == 0 || cost > u->pm_left) continue;
+                Unit *occ = unit_at(gs, nx, ny, UNIT_OWNER_PLAYER);
+                if (occ && occ->id != u->id) continue;
+                int d = chebyshev(nx, ny, tx, ty);
+                if (d < best_d || (d == best_d && cost < best_cost)) {
+                    best_d = d; best_cost = cost;
+                    best_dx = dx; best_dy = dy;
+        }}}
+        if (best_dx == 0 && best_dy == 0) break;
+        int nx = u->x + best_dx, ny = u->y + best_dy;
+        if (!unit_move(gs, u, nx, ny)) break;
+        if (!unit_by_id(gs, u->id)) break;
+    }
+}
