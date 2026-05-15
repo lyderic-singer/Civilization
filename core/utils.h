@@ -3,7 +3,7 @@
 
 #include "core.h"
 
-const int MOVE_COSTS[TERRAIN_COUNT];
+extern const int MOVE_COSTS[TERRAIN_COUNT];
 
 int chebyshev(int ax, int ay, int bx, int by);
 Seed gen_random_seed(void);
