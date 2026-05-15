@@ -1,7 +1,7 @@
 #ifndef TECH_H
 #define TECH_H
 
-#include "core.h"
+#include "structs.h"
 
 const TechDef *tech_def(int tech_id);
 void tech_init(TechState *ts);

@@ -1,7 +1,7 @@
 #ifndef STRUCTS_H
 #define STRUCTS_H
 
-#include "core.h"
+#include "../config.h"
 
 /* ════ MAP ════ */
 

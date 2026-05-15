@@ -1,7 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include "core.h"
+#include "structs.h"
 
 extern const int MOVE_COSTS[TERRAIN_COUNT];
 

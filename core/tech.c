@@ -1,4 +1,4 @@
-#include "tech.h"
+#include "core.h"
 
 const TechDef TECH_DEFS[TECH_COUNT] = {
 {.id = TECH_ID_HUNTING, .name = "Chasse", .cost = TECH_COST_HUNTING, .prereqs = { TECH_ID_NONE, TECH_ID_NONE, TECH_ID_NONE, TECH_ID_NONE }, .prereq_count = 0, .bonus_forest_food = 1 },

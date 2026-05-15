@@ -1,7 +1,7 @@
 #ifndef UNITS_H
 #define UNITS_H
 
-#include "core.h"
+#include "structs.h"
 
 Unit *unit_create(GameState *gs, UnitType type, UnitOwner owner, int x, int y);
 void unit_destroy(GameState *gs, int unit_id);

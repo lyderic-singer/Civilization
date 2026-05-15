@@ -1,7 +1,7 @@
 #ifndef CITIES_H
 #define CITIES_H
 
-#include "core.h"
+#include "structs.h"
 
 typedef struct {
     int flag;

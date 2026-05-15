@@ -1,4 +1,4 @@
-#include "cities.h"
+#include "core.h"
 
 const BuildingInfo BUILDINGS[] = {
     {BUILDING_GRANARY,  "Grenier",      BUILDING_GRANARY_COST,   BUILDING_GRANARY_MAINT},

@@ -1,4 +1,4 @@
-#include "barbarians.h"
+#include "core.h"
 
 const int TERRAIN_COSTS[TERRAIN_COUNT] = {
     TERRAIN_PLAIN_COST,

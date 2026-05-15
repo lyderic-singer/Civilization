@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "core.h"
 
 const int MOVE_COSTS[TERRAIN_COUNT] = {
     TERRAIN_PLAIN_COST, TERRAIN_FOREST_COST, TERRAIN_MOUNTAIN_COST,

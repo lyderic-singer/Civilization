@@ -1,4 +1,4 @@
-#include "lifecycle.h"
+#include "core.h"
 
 Tile **alloc_tiles(int W, int H) {
     Tile **tiles = malloc(H * sizeof(Tile *));
