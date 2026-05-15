@@ -1,24 +1,14 @@
-CC      = gcc
-CFLAGS  = -Wall -Wextra -Wpedantic -std=c11 -g -O2
-LDFLAGS = -lm
+CC      = clang
+CFLAGS  = -Wall -Wextra -Wpedantic -std=gnu11 -g
+CFLAGS += $(shell pkg-config --cflags sdl2)
+LDFLAGS  = $(shell pkg-config --libs sdl2)
 
-SRC_DIR = src
-OBJ_DIR = obj
-
-SRCS = $(SRC_DIR)/game.c \
-       $(SRC_DIR)/gen.c  \
-       $(SRC_DIR)/units.c \
-       $(SRC_DIR)/cities.c \
-       $(SRC_DIR)/barbarians.c \
-       $(SRC_DIR)/tech.c
-
-OBJS = $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRCS))
-
+SRCS   = $(shell find . -name "*.c" -not -path "./.git/*" -not -path "./tests/*")
+OBJS   = $(SRCS:.c=.o)
 TARGET = civ
 
-# ── Test sources ──────────────────────────────────────────────
-TEST_SRC = tests/test_main.c
-TEST_BIN = tests/run_tests
+TEST_SRCS = $(shell find tests -name "*.c" 2>/dev/null)
+TEST_BIN  = tests/run_tests
 
 .PHONY: all cli sdl req test clean reset
 
@@ -27,34 +17,27 @@ all: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
-	$(CC) $(CFLAGS) -I$(SRC_DIR) -c $< -o $@
-
-$(OBJ_DIR):
-	mkdir -p $(OBJ_DIR)
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 cli: $(TARGET)
 	./$(TARGET) --mode cli
 
 sdl: $(TARGET)
-	@echo "Mode SDL non implemente (utilisez --mode cli)"
-	./$(TARGET) --mode cli
+	./$(TARGET) --mode sdl
 
 req:
-	@echo "Aucune dependance externe requise (C standard + math)."
+	sudo apt-get install -y libsdl2-dev
 
-# ── Tests ─────────────────────────────────────────────────────
 test: $(TEST_BIN)
 	./$(TEST_BIN)
 
-# Compile all non-main objects for test reuse
-TEST_OBJS = $(filter-out $(OBJ_DIR)/game.o, $(OBJS))
-
-$(TEST_BIN): $(TEST_SRC) $(TEST_OBJS) | $(OBJ_DIR)
-	$(CC) $(CFLAGS) -I$(SRC_DIR) -o $@ $^ $(LDFLAGS)
+$(TEST_BIN): $(TEST_SRCS) $(filter-out ./main.o, $(OBJS))
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 clean:
-	rm -rf $(OBJ_DIR) $(TARGET) $(TEST_BIN)
+	find . -name "*.o" -delete
+	rm -f $(TARGET) $(TEST_BIN)
 
 reset: clean
-	@echo "Aucun fichier de donnees a supprimer."
+	rm -f saves/*.sav scores.txt
