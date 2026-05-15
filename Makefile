@@ -1,7 +1,7 @@
 CC      = clang
 CFLAGS  = -Wall -Wextra -Wpedantic -std=gnu11 -g
 CFLAGS += $(shell pkg-config --cflags sdl2)
-LDFLAGS  = $(shell pkg-config --libs sdl2)
+LDFLAGS  = $(shell pkg-config --libs sdl2) -lSDL2_ttf
 
 SRCS   = $(shell find . -name "*.c" -not -path "./.git/*" -not -path "./tests/*")
 OBJS   = $(SRCS:.c=.o)
@@ -27,7 +27,7 @@ sdl: $(TARGET)
 	./$(TARGET) --mode sdl
 
 req:
-	sudo apt-get install -y libsdl2-dev
+	sudo apt-get install -y libsdl2-dev libsdl2-ttf-dev
 
 test: $(TEST_BIN)
 	./$(TEST_BIN)
