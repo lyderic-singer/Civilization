@@ -2,21 +2,21 @@
 #define SDL_UI_H
 
 #include "../core/core.h"
-#include <sys/types.h>
+#include "../core/turn.h"
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
+#include <stdint.h>
 
-#define TILE_SIZE   32
+#define TILE_SIZE 32
 #define MARGIN_SIZE 6
+#define FONT_SIZE 24
+#define LINE_H (FONT_SIZE + 8)
+#define PANEL_PAD 10
+#define PANEL_LINES 3
+#define PANEL_H (PANEL_PAD + PANEL_LINES * LINE_H + PANEL_PAD)
+#define FONT_PATH "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+#define GAP 20
 
-typedef struct { u_int8_t r, g, b; } Color;
-
-static const Color TERRAIN_COLORS[TERRAIN_COUNT] = {
-    [TERRAIN_PLAIN]    = { 144, 200, 100 },
-    [TERRAIN_FOREST]   = {  34, 100,  34 },
-    [TERRAIN_MOUNTAIN] = { 150, 130, 100 },
-    [TERRAIN_WATER]    = {  64, 120, 200 },
-    [TERRAIN_DESERT]   = { 230, 200, 100 },
-    [TERRAIN_TUNDRA]   = { 200, 220, 230 },
-};
 
 void sdl_run(GameState *gs);
 
