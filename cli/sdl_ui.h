@@ -4,7 +4,8 @@
 #include "../core/core.h"
 #include <sys/types.h>
 
-#define TILE_SIZE   16
+#define TILE_SIZE   32
+#define MARGIN_SIZE 6
 
 typedef struct { u_int8_t r, g, b; } Color;
 

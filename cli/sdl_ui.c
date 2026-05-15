@@ -21,6 +21,39 @@ static void draw_map(SDL_Renderer *r, const GameState *gs) {
                       gs->map.tiles[y][x].terrain);
 }
 
+static void draw_entity(SDL_Renderer *r, int x, int y, Uint8 red, Uint8 green, Uint8 blue) {
+    SDL_Rect rect = {
+        x * TILE_SIZE + MARGIN_SIZE,
+        y * TILE_SIZE + MARGIN_SIZE,
+        TILE_SIZE - MARGIN_SIZE*2,
+        TILE_SIZE - MARGIN_SIZE*2
+    };
+    SDL_SetRenderDrawColor(r, red, green, blue, 255);
+    SDL_RenderFillRect(r, &rect);
+}
+
+/* Couleurs (avant de metttre des assets) :
+terrain : Vert=Plaine  SapinFoncé=Forêt  Beige=Montagne  Bleu=Eau  Sable=Désert  GrisClair=Toundra
+entités : Blanc=Ville  Orange=Camp  Rouge=Barbare  Jaune=Colon  Bleu=Guerrier */
+
+static void draw_entities(SDL_Renderer *r, const GameState *gs) {
+    for (City *c = gs->cities; c; c = c->next)
+        draw_entity(r, c->x, c->y, 255, 255, 255);
+
+    for (Camp *c = gs->camps; c; c = c->next)
+        if (c->alive)
+            draw_entity(r, c->x, c->y, 220, 120, 30);
+
+    for (Unit *u = gs->units; u; u = u->next) {
+        if (u->owner == UNIT_OWNER_BARB)
+            draw_entity(r, u->x, u->y, 200, 40, 40);
+        else if (u->type == UNIT_TYPE_SETTLER)
+            draw_entity(r, u->x, u->y, 240, 220, 50);
+        else
+            draw_entity(r, u->x, u->y, 50, 150, 240);
+    }
+}
+
 void sdl_run(GameState *gs) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -68,6 +101,7 @@ void sdl_run(GameState *gs) {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
         draw_map(renderer, gs);
+        draw_entities(renderer, gs);
         SDL_RenderPresent(renderer);
     }
 
