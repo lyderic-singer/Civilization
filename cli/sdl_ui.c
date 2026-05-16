@@ -43,6 +43,9 @@ static const SDL_Color COL_WARRIOR = {  50, 150, 240, 255 };
 static const SDL_Color COL_SELECT = { 255, 255,   0, 255 };
 static const SDL_Color COL_RED = { 255,  60,  60, 255 };
 static const SDL_Color COL_GREEN = {  80, 220,  80, 255 };
+static const SDL_Color COL_MENU_BG = { 20, 20, 30, 255 };
+static const SDL_Color COL_MENU_BORDER = { 80, 80, 100, 255 };
+static const SDL_Color COL_BLACK = { 0, 0, 0, 255 };
 
 static void camera_clamp(Camera *cam, GameState *gs) {
     int tiles_x = SCREEN_W / TILE_SIZE;
@@ -175,9 +178,9 @@ static void draw_menu_city(SDL_Renderer *r, TTF_Font *font, int cursor, City *ci
     int my = (SCREEN_H - h) / 2;
 
     SDL_Rect bg = { mx, my, w, h };
-    SDL_SetRenderDrawColor(r, 20, 20, 30, 255);
+    SDL_SetRenderDrawColor(r, COL_MENU_BG.r, COL_MENU_BG.g, COL_MENU_BG.b, COL_MENU_BG.a);
     SDL_RenderFillRect(r, &bg);
-    SDL_SetRenderDrawColor(r, 80, 80, 100, 255);
+    SDL_SetRenderDrawColor(r, COL_MENU_BORDER.r, COL_MENU_BORDER.g, COL_MENU_BORDER.b, COL_MENU_BORDER.a);
     SDL_RenderDrawRect(r, &bg);
 
     draw_text(r, font, "Projet de construction", mx + PANEL_PAD, my + PANEL_PAD, COL_WHITE);
@@ -201,15 +204,51 @@ static void draw_menu_city(SDL_Renderer *r, TTF_Font *font, int cursor, City *ci
     }
 }
 
+static void draw_menu_tech(SDL_Renderer *r, TTF_Font *font, int cursor, GameState *gs) {
+    int w = 350;
+    int h = PANEL_PAD + LINE_H + LINE_H + TECH_COUNT * LINE_H + PANEL_PAD;
+    int mx = (SCREEN_W - w) / 2;
+    int my = (SCREEN_H - h) / 2;
+
+    SDL_Rect bg = { mx, my, w, h };
+    SDL_SetRenderDrawColor(r, COL_MENU_BG.r, COL_MENU_BG.g, COL_MENU_BG.b, COL_MENU_BG.a);
+    SDL_RenderFillRect(r, &bg);
+    SDL_SetRenderDrawColor(r, COL_MENU_BORDER.r, COL_MENU_BORDER.g, COL_MENU_BORDER.b, COL_MENU_BORDER.a);
+    SDL_RenderDrawRect(r, &bg);
+
+    draw_text(r, font, "Recherche technologique", mx + PANEL_PAD, my + PANEL_PAD, COL_WHITE);
+
+    if (gs->tech.researching != TECH_ID_NONE) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "En cours: %s", tech_def(gs->tech.researching)->name);
+        draw_text(r, font, buf, mx + PANEL_PAD, my + PANEL_PAD + LINE_H, COL_CYAN);
+    } else {
+        draw_text(r, font, "Aucune recherche", mx + PANEL_PAD, my + PANEL_PAD + LINE_H, COL_GRAY);
+    }
+
+    for (int i = 0; i < TECH_COUNT; i++) {
+        const TechDef *td = tech_def(i);
+        SDL_Color col;
+        if (gs->tech.acquired[i])
+            col = COL_GREEN;
+        else if (tech_available(&gs->tech, i))
+            col = (i == cursor) ? COL_WHITE : COL_YELLOW;
+        else
+            col = COL_GRAY;
+        draw_text(r, font, td->name, mx + PANEL_PAD,
+                  my + PANEL_PAD + (i + 2) * LINE_H, col);
+    }
+}
+
 static void draw_panel(SDL_Renderer *r, TTF_Font *font,
                        GameState *gs, int selected_id,
                        const char *status_msg, SDL_Color status_col,
                        MenuState menu) {
-    SDL_SetRenderDrawColor(r, 20, 20, 30, 255);
+    SDL_SetRenderDrawColor(r, COL_MENU_BG.r, COL_MENU_BG.g, COL_MENU_BG.b, COL_MENU_BG.a);
     SDL_Rect bg = { 0, SCREEN_H, SCREEN_W, PANEL_H };
     SDL_RenderFillRect(r, &bg);
 
-    SDL_SetRenderDrawColor(r, 80, 80, 100, 255);
+    SDL_SetRenderDrawColor(r, COL_MENU_BORDER.r, COL_MENU_BORDER.g, COL_MENU_BORDER.b, COL_MENU_BORDER.a);
     SDL_RenderDrawLine(r, 0, SCREEN_H, SCREEN_W, SCREEN_H);
 
     char buf[128];
@@ -358,12 +397,28 @@ void sdl_run(GameState *gs) {
                     case SDLK_LEFT:   if (menu == MENU_NONE) { cam.x--; camera_clamp(&cam, gs); } break;
                     case SDLK_RIGHT:  if (menu == MENU_NONE) { cam.x++; camera_clamp(&cam, gs); } break;
                     case SDLK_UP:
-                        if (menu != MENU_NONE) { menu_cursor--; if (menu_cursor < 0) menu_cursor = CITY_ITEMS_N - 1; }
-                        else { cam.y--; camera_clamp(&cam, gs); }
+                        if (menu == MENU_CITY) {
+                            menu_cursor = (menu_cursor - 1 + CITY_ITEMS_N) % CITY_ITEMS_N;
+                        } else if (menu == MENU_TECH) {
+                            int start = menu_cursor;
+                            do { menu_cursor = (menu_cursor - 1 + TECH_COUNT) % TECH_COUNT; }
+                            while (!tech_available(&gs->tech, menu_cursor) && menu_cursor != start);
+                        } else { cam.y--; camera_clamp(&cam, gs); }
                         break;
                     case SDLK_DOWN:
-                        if (menu != MENU_NONE) { menu_cursor++; if (menu_cursor >= CITY_ITEMS_N) menu_cursor = 0; }
-                        else { cam.y++; camera_clamp(&cam, gs); }
+                        if (menu == MENU_CITY) {
+                            menu_cursor = (menu_cursor + 1) % CITY_ITEMS_N;
+                        } else if (menu == MENU_TECH) {
+                            int start = menu_cursor;
+                            do { menu_cursor = (menu_cursor + 1) % TECH_COUNT; }
+                            while (!tech_available(&gs->tech, menu_cursor) && menu_cursor != start);
+                        } else { cam.y++; camera_clamp(&cam, gs); }
+                        break;
+                    case SDLK_t:
+                        if (menu == MENU_NONE) {
+                            menu = MENU_TECH;
+                            menu_cursor = 0;
+                        }
                         break;
                     case SDLK_c:
                         if (selected_id != -1) {
@@ -388,6 +443,21 @@ void sdl_run(GameState *gs) {
                             menu = MENU_NONE;
                             break;
                         }
+                        if (menu == MENU_TECH) {
+                            if (tech_available(&gs->tech, menu_cursor)) {
+                                tech_set_research(&gs->tech, menu_cursor);
+                                snprintf(status_msg, sizeof(status_msg), "Recherche: %s", tech_def(menu_cursor)->name);
+                                status_col = COL_GREEN;
+                            } else if (gs->tech.acquired[menu_cursor]) {
+                                snprintf(status_msg, sizeof(status_msg), "Deja acquise");
+                                status_col = COL_RED;
+                            } else {
+                                snprintf(status_msg, sizeof(status_msg), "Prerequis manquants");
+                                status_col = COL_RED;
+                            }
+                            menu = MENU_NONE;
+                            break;
+                        }
                         selected_id = -1;
                         game_phase_production(gs);
                         cities_grow(gs);
@@ -408,12 +478,13 @@ void sdl_run(GameState *gs) {
             }
         }
 
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_SetRenderDrawColor(renderer, COL_BLACK.r, COL_BLACK.g, COL_BLACK.b, COL_BLACK.a);
         SDL_RenderClear(renderer);
         draw_map(renderer, gs, cam);
         draw_entities(renderer, gs, cam);
         draw_panel(renderer, font, gs, selected_id, status_msg, status_col, menu);
         if (menu == MENU_CITY) draw_menu_city(renderer, font, menu_cursor, menu_city);
+        if (menu == MENU_TECH) draw_menu_tech(renderer, font, menu_cursor, gs);
         if (selected_id != -1) {
             Unit *u = unit_by_id(gs, selected_id);
             if (u) draw_selection(renderer, u->x, u->y, cam);
