@@ -196,6 +196,12 @@ int city_can_build(GameState *gs, City *c, int building_flag) {
     }
 }
 
+int city_can_produce_unit(GameState *gs, City *c, UnitType ut) {
+    if (ut == UNIT_TYPE_WARRIOR)
+        return gs->warrior_unlocked && (c->buildings & BUILDING_BARRACKS);
+    return 1;
+}
+
 void cities_produce(GameState *gs) {
     for (City *c = gs->cities; c; c = c->next) {
         if (c->project_type == PROJECT_NONE) continue;
