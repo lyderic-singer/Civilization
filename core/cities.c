@@ -198,6 +198,13 @@ int city_can_build(GameState *gs, City *c, int building_flag) {
     }
 }
 
+int city_growth_threshold(City *c) {
+    int t = CITY_GROWTH_BASE + CITY_GROWTH_PER_POP * c->population;
+    if (c->buildings & BUILDING_GRANARY)
+        t = (int)(t / BUILDING_GRANARY_GROWTH_DIV);
+    return t;
+}
+
 int city_can_produce_unit(GameState *gs, City *c, UnitType ut) {
     if (ut == UNIT_TYPE_WARRIOR)
         return gs->warrior_unlocked && (c->buildings & BUILDING_BARRACKS);
@@ -237,9 +244,7 @@ void cities_grow(GameState *gs) {
         int consumption = CITY_FOOD_CONSUMPTION_FACTOR * c->population;
         int net_food = c->yield_food - consumption;
         c->food_stock += net_food;
-        int threshold = CITY_GROWTH_BASE + CITY_GROWTH_PER_POP * c->population;
-        if (c->buildings & BUILDING_GRANARY)
-            threshold = (int)(threshold / BUILDING_GRANARY_GROWTH_DIV);
+        int threshold = city_growth_threshold(c);
         if (c->food_stock >= threshold) {
             c->food_stock = 0;
             c->population++;

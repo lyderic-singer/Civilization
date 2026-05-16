@@ -22,6 +22,7 @@ void cities_heal(GameState *gs);
 void cities_reset_damage_flag(GameState *gs);
 int cities_total_building_maint(GameState *gs);
 int city_can_build(GameState *gs, City *c, int building_flag);
+int city_growth_threshold(City *c);
 int city_can_produce_unit(GameState *gs, City *c, UnitType ut);
 const char *building_name(int flag);
 void city_set_project(City *c, int project_type, int project_id);
