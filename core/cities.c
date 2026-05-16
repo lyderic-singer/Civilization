@@ -68,6 +68,7 @@ City *city_create(GameState *gs, int x, int y, int founded_turn) {
     gs->cities = c;
     gs->map.tiles[y][x].city_id = c->id;
     city_recompute_hp(c);
+    c->hp = c->hp_max;
     return c;
 }
 
