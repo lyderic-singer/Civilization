@@ -107,9 +107,10 @@ static void draw_selection(SDL_Renderer *r, int tx, int ty, Camera cam) {
 }
 
 static void handle_click(GameState *gs, int px, int py, int *selected_id, Camera cam,
-                         char *status_msg, MenuState *menu, City **menu_city) {
+                         char *status_msg, MenuState *menu, City **menu_city, int *info_id) {
     status_msg[0] = '\0';
     *menu = MENU_NONE;
+    *info_id = -1;
     int tx = px / TILE_SIZE + cam.x;
     int ty = py / TILE_SIZE + cam.y;
 
@@ -121,11 +122,15 @@ static void handle_click(GameState *gs, int px, int py, int *selected_id, Camera
             *menu = MENU_CITY;
             *menu_city = c;
             *selected_id = -1;
+            *info_id = -1;
             return;
         }
     }
 
+    Unit *any = unit_any_at(gs, tx, ty);
     Unit *pu = unit_at(gs, tx, ty, UNIT_OWNER_PLAYER);
+
+    if (any) *info_id = any->id;
 
     if (*selected_id == -1) {
         if (pu) *selected_id = pu->id;
@@ -260,7 +265,7 @@ static void draw_menu_tech(SDL_Renderer *r, TTF_Font *font, int cursor, GameStat
 }
 
 static void draw_panel(SDL_Renderer *r, TTF_Font *font,
-                       GameState *gs, int selected_id,
+                       GameState *gs, int selected_id, int info_id,
                        const char *status_msg, SDL_Color status_col,
                        MenuState menu) {
     SDL_SetRenderDrawColor(r, COL_MENU_BG.r, COL_MENU_BG.g, COL_MENU_BG.b, COL_MENU_BG.a);
@@ -291,11 +296,13 @@ static void draw_panel(SDL_Renderer *r, TTF_Font *font,
         draw_text_adv(r, font, &x, y1, "Recherche: aucune (T pour choisir)", COL_GRAY);
     }
 
-    if (selected_id != -1) {
-        Unit *u = unit_by_id(gs, selected_id);
+    int display_id = (info_id != -1) ? info_id : selected_id;
+    if (display_id != -1) {
+        Unit *u = unit_by_id(gs, display_id);
         if (u) {
-            snprintf(buf, sizeof(buf), "| %s  PV:%d/%d  PM:%d/%d",
-                     unit_type_name(u->type), u->hp, u->hp_max, u->pm_left, u->pm_max);
+            const char *owner = (u->owner == UNIT_OWNER_PLAYER) ? "Allie" : "Ennemi";
+            snprintf(buf, sizeof(buf), "| %s (%s)  PV:%d/%d  PM:%d/%d",
+                     unit_type_name(u->type), owner, u->hp, u->hp_max, u->pm_left, u->pm_max);
             draw_text_adv(r, font, &x, y1, buf, COL_WHITE);
         }
     }
@@ -454,6 +461,7 @@ void sdl_run(GameState *gs) {
 
     int running = 1;
     int selected_id = -1;
+    int info_id = -1;
     char status_msg[128] = "";
     SDL_Color status_col = COL_RED;
     MenuState menu = MENU_NONE;
@@ -560,7 +568,7 @@ void sdl_run(GameState *gs) {
             }
 
             if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
-                handle_click(gs, e.button.x, e.button.y, &selected_id, cam, status_msg, &menu, &menu_city);
+                handle_click(gs, e.button.x, e.button.y, &selected_id, cam, status_msg, &menu, &menu_city, &info_id);
                 if (menu == MENU_CITY) menu_cursor = 0;
             }
         }
@@ -569,7 +577,7 @@ void sdl_run(GameState *gs) {
         SDL_RenderClear(renderer);
         draw_map(renderer, gs, cam);
         draw_entities(renderer, gs, cam);
-        draw_panel(renderer, font, gs, selected_id, status_msg, status_col, menu);
+        draw_panel(renderer, font, gs, selected_id, info_id, status_msg, status_col, menu);
         if (menu == MENU_CITY) draw_menu_city(renderer, font, menu_cursor, menu_city, gs);
         if (menu == MENU_TECH) draw_menu_tech(renderer, font, menu_cursor, gs);
         if (selected_id != -1) {
