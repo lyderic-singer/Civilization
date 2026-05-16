@@ -317,6 +317,65 @@ static void draw_panel(SDL_Renderer *r, TTF_Font *font,
     draw_legend_item(r, font, &x, y3, COL_WARRIOR, "Guerrier");
 }
 
+static void draw_end_screen(SDL_Renderer *r, TTF_Font *font, GameState *gs) {
+    SDL_SetRenderDrawColor(r, COL_MENU_BG.r, COL_MENU_BG.g, COL_MENU_BG.b, COL_MENU_BG.a);
+    SDL_Rect bg = { 0, 0, SCREEN_W, SCREEN_H + PANEL_H };
+    SDL_RenderFillRect(r, &bg);
+
+    const char *title;
+    SDL_Color title_col;
+    const char *reason;
+
+    switch (gs->result) {
+        case RESULT_WIN_SCI:
+            title = "VICTOIRE SCIENTIFIQUE";
+            title_col = COL_GREEN;
+            reason = "Vous avez acquis toutes les technologies !";
+            break;
+        case RESULT_WIN_TERR:
+            title = "VICTOIRE TERRITORIALE";
+            title_col = COL_GREEN;
+            reason = "Vous avez controle 10 villes pendant 5 tours !";
+            break;
+        case RESULT_LOSS_NOCITY:
+            title = "DEFAITE";
+            title_col = COL_RED;
+            reason = "Toutes vos villes ont ete detruites.";
+            break;
+        case RESULT_LOSS_TURNS:
+            title = "DEFAITE";
+            title_col = COL_RED;
+            reason = "Le nombre de tours maximum est ecoule.";
+            break;
+        case RESULT_LOSS_PROD:
+            title = "DEFAITE";
+            title_col = COL_RED;
+            reason = "Production nulle pendant trop longtemps.";
+            break;
+        default:
+            title = "FIN DE PARTIE";
+            title_col = COL_WHITE;
+            reason = "";
+            break;
+    }
+
+    int cx = SCREEN_W / 2;
+    int cy = SCREEN_H / 2;
+
+    draw_text(r, font, title,
+              cx - text_width(font, title) / 2, cy - LINE_H * 2, title_col);
+    draw_text(r, font, reason,
+              cx - text_width(font, reason) / 2, cy - LINE_H, COL_WHITE);
+
+    char score_buf[64];
+    snprintf(score_buf, sizeof(score_buf), "Score : %d", game_compute_score(gs));
+    draw_text(r, font, score_buf,
+              cx - text_width(font, score_buf) / 2, cy + LINE_H, COL_YELLOW);
+
+    draw_text(r, font, "[Echap] Quitter",
+              cx - text_width(font, "[Echap] Quitter") / 2, cy + LINE_H * 3, COL_GRAY);
+}
+
 static void draw_entities(SDL_Renderer *r, GameState *gs, Camera cam) {
     for (City *c = gs->cities; c; c = c->next)
         draw_entity(r, c->x, c->y, COL_CITY, cam);
@@ -519,6 +578,22 @@ void sdl_run(GameState *gs) {
             else   selected_id = -1;
         }
         SDL_RenderPresent(renderer);
+    }
+
+    if (gs->result != RESULT_ONGOING) {
+        SDL_SetRenderDrawColor(renderer, COL_BLACK.r, COL_BLACK.g, COL_BLACK.b, COL_BLACK.a);
+        SDL_RenderClear(renderer);
+        draw_end_screen(renderer, font, gs);
+        SDL_RenderPresent(renderer);
+
+        SDL_Event e;
+        int done = 0;
+        while (!done) {
+            while (SDL_PollEvent(&e)) {
+                if (e.type == SDL_QUIT) done = 1;
+                if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) done = 1;
+            }
+        }
     }
 
     TTF_CloseFont(font);
