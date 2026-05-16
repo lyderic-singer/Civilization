@@ -200,10 +200,12 @@ static int city_item_built(City *city, int idx) {
 }
 
 static void draw_menu_city(SDL_Renderer *r, TTF_Font *font, int cursor, City *city, GameState *gs) {
-    int w = 300;
-    int h = PANEL_PAD + LINE_H + LINE_H + CITY_ITEMS_N * LINE_H + PANEL_PAD;
+    int w = SCREEN_W / 2;
+    int n_info = 7;
+    int h = PANEL_PAD + n_info * LINE_H + CITY_ITEMS_N * LINE_H + PANEL_PAD;
     int mx = (SCREEN_W - w) / 2;
     int my = (SCREEN_H - h) / 2;
+    int col2 = mx + w / 2;
 
     SDL_Rect bg = { mx, my, w, h };
     SDL_SetRenderDrawColor(r, COL_MENU_BG.r, COL_MENU_BG.g, COL_MENU_BG.b, COL_MENU_BG.a);
@@ -211,19 +213,49 @@ static void draw_menu_city(SDL_Renderer *r, TTF_Font *font, int cursor, City *ci
     SDL_SetRenderDrawColor(r, COL_MENU_BORDER.r, COL_MENU_BORDER.g, COL_MENU_BORDER.b, COL_MENU_BORDER.a);
     SDL_RenderDrawRect(r, &bg);
 
-    draw_text(r, font, "Projet de construction", mx + PANEL_PAD, my + PANEL_PAD, COL_WHITE);
+    char buf[128];
+    int y = my + PANEL_PAD;
+    int food_thresh = city_growth_threshold(city);
+
+    snprintf(buf, sizeof(buf), "Pop: %d", city->population);
+    draw_text(r, font, buf, mx + PANEL_PAD, y, COL_WHITE);
+    snprintf(buf, sizeof(buf), "PV: %d/%d", city->hp, city->hp_max);
+    draw_text(r, font, buf, col2, y, COL_WHITE); y += LINE_H;
+
+    snprintf(buf, sizeof(buf), "Nourr: +%d/tour", city->yield_food);
+    draw_text(r, font, buf, mx + PANEL_PAD, y, COL_GREEN);
+    snprintf(buf, sizeof(buf), "Reserve: %d/%d", city->food_stock, food_thresh);
+    draw_text(r, font, buf, col2, y, COL_GREEN); y += LINE_H;
+
+    snprintf(buf, sizeof(buf), "Prod: +%d/tour", city->yield_prod);
+    draw_text(r, font, buf, mx + PANEL_PAD, y, COL_YELLOW);
+    snprintf(buf, sizeof(buf), "Stock: %d", city->prod_stock);
+    draw_text(r, font, buf, col2, y, COL_YELLOW); y += LINE_H;
+
+    snprintf(buf, sizeof(buf), "Or: +%d/tour", city->yield_gold);
+    draw_text(r, font, buf, mx + PANEL_PAD, y, COL_YELLOW);
+    snprintf(buf, sizeof(buf), "Total: %d", gs->gold);
+    draw_text(r, font, buf, col2, y, COL_YELLOW); y += LINE_H;
+
+    snprintf(buf, sizeof(buf), "Science: +%d/tour", city->yield_science);
+    draw_text(r, font, buf, mx + PANEL_PAD, y, COL_CYAN);
+    snprintf(buf, sizeof(buf), "Total: %d", gs->tech.science_stored);
+    draw_text(r, font, buf, col2, y, COL_CYAN); y += LINE_H;
 
     if (city->project_type != PROJECT_NONE) {
         const char *cur = "?";
+        int cost = city_project_cost(gs, city);
         for (int i = 0; i < CITY_ITEMS_N; i++)
             if (CITY_ITEMS[i].type == city->project_type && CITY_ITEMS[i].id == city->project_id)
                 cur = CITY_ITEMS[i].label;
-        char buf[64];
-        snprintf(buf, sizeof(buf), "En cours: %s", cur);
-        draw_text(r, font, buf, mx + PANEL_PAD, my + PANEL_PAD + LINE_H, COL_CYAN);
+        snprintf(buf, sizeof(buf), "En cours: %s [%d/%d]", cur, city->prod_stock, cost);
+        draw_text(r, font, buf, mx + PANEL_PAD, y, COL_CYAN);
     } else {
-        draw_text(r, font, "Aucun projet", mx + PANEL_PAD, my + PANEL_PAD + LINE_H, COL_GRAY);
+        draw_text(r, font, "Aucun projet", mx + PANEL_PAD, y, COL_GRAY);
     }
+    y += LINE_H;
+
+    draw_text(r, font, "--- Construire ---", mx + PANEL_PAD, y, COL_GRAY); y += LINE_H;
 
     for (int i = 0; i < CITY_ITEMS_N; i++) {
         SDL_Color col;
@@ -233,8 +265,7 @@ static void draw_menu_city(SDL_Renderer *r, TTF_Font *font, int cursor, City *ci
             col = (i == cursor) ? COL_WHITE : COL_YELLOW;
         else
             col = COL_GRAY;
-        draw_text(r, font, CITY_ITEMS[i].label, mx + PANEL_PAD,
-                  my + PANEL_PAD + (i + 2) * LINE_H, col);
+        draw_text(r, font, CITY_ITEMS[i].label, mx + PANEL_PAD, y + i * LINE_H, col);
     }
 }
 
