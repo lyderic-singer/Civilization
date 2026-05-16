@@ -26,6 +26,8 @@ static const SDL_Color COL_BARB = { 200,  40,  40, 255 };
 static const SDL_Color COL_SETTLER = { 240, 220,  50, 255 };
 static const SDL_Color COL_WARRIOR = {  50, 150, 240, 255 };
 static const SDL_Color COL_SELECT = { 255, 255,   0, 255 };
+static const SDL_Color COL_RED = { 255,  60,  60, 255 };
+static const SDL_Color COL_GREEN = {  80, 220,  80, 255 };
 
 static void camera_clamp(Camera *cam, GameState *gs) {
     int tiles_x = SCREEN_W / TILE_SIZE;
@@ -86,7 +88,9 @@ static void draw_selection(SDL_Renderer *r, int tx, int ty, Camera cam) {
     SDL_RenderDrawRect(r, &inner);
 }
 
-static void handle_click(GameState *gs, int px, int py, int *selected_id, Camera cam) {
+static void handle_click(GameState *gs, int px, int py, int *selected_id, Camera cam,
+                         char *status_msg) {
+    status_msg[0] = '\0';
     int tx = px / TILE_SIZE + cam.x;
     int ty = py / TILE_SIZE + cam.y;
 
@@ -124,7 +128,7 @@ static int text_width(TTF_Font *font, const char *text) {
     return w;
 }
 
-static void draw_stat(SDL_Renderer *r, TTF_Font *font,
+static void draw_text_adv(SDL_Renderer *r, TTF_Font *font,
                       int *x, int y, const char *text, SDL_Color color) {
     draw_text(r, font, text, *x, y, color);
     *x += text_width(font, text) + GAP;
@@ -140,7 +144,8 @@ static void draw_legend_item(SDL_Renderer *r, TTF_Font *font,
 }
 
 static void draw_panel(SDL_Renderer *r, TTF_Font *font,
-                       GameState *gs, int selected_id) {
+                       GameState *gs, int selected_id,
+                       const char *status_msg, SDL_Color status_col) {
     SDL_SetRenderDrawColor(r, 20, 20, 30, 255);
     SDL_Rect bg = { 0, SCREEN_H, SCREEN_W, PANEL_H };
     SDL_RenderFillRect(r, &bg);
@@ -155,18 +160,18 @@ static void draw_panel(SDL_Renderer *r, TTF_Font *font,
     int x = PANEL_PAD;
 
     snprintf(buf, sizeof(buf), "Tour %d/%d", gs->turn, gs->turn_max);
-    draw_stat(r, font, &x, y1, buf, COL_WHITE);
+    draw_text_adv(r, font, &x, y1, buf, COL_WHITE);
 
     snprintf(buf, sizeof(buf), "Or: %d", gs->gold);
-    draw_stat(r, font, &x, y1, buf, COL_YELLOW);
+    draw_text_adv(r, font, &x, y1, buf, COL_YELLOW);
 
     if (gs->tech.researching != TECH_ID_NONE) {
         const TechDef *td = tech_def(gs->tech.researching);
         snprintf(buf, sizeof(buf), "Recherche: %s [%d/%d]",
                  td->name, gs->tech.science_stored, td->cost);
-        draw_stat(r, font, &x, y1, buf, COL_CYAN);
+        draw_text_adv(r, font, &x, y1, buf, COL_CYAN);
     } else {
-        draw_stat(r, font, &x, y1, "Recherche: aucune (T pour choisir)", COL_GRAY);
+        draw_text_adv(r, font, &x, y1, "Recherche: aucune (T pour choisir)", COL_GRAY);
     }
 
     if (selected_id != -1) {
@@ -174,9 +179,11 @@ static void draw_panel(SDL_Renderer *r, TTF_Font *font,
         if (u) {
             snprintf(buf, sizeof(buf), "| %s  PV:%d/%d  PM:%d/%d",
                      unit_type_name(u->type), u->hp, u->hp_max, u->pm_left, u->pm_max);
-            draw_text(r, font, buf, x, y1, COL_WHITE);
+            draw_text_adv(r, font, &x, y1, buf, COL_WHITE);
         }
     }
+    if (status_msg[0])
+        draw_text(r, font, status_msg, x, y1, status_col);
 
     draw_text(r, font, "[Entree=fin de tour]  [C=coloniser]  [T=tech]  [Fleches=scroll]  [Echap=quitter]",
               PANEL_PAD, y2, COL_GRAY);
@@ -265,8 +272,10 @@ void sdl_run(GameState *gs) {
 
     Camera cam = { 0, 0 };
 
-    int running     = 1;
+    int running = 1;
     int selected_id = -1;
+    char status_msg[128] = "";
+    SDL_Color status_col = COL_RED;
 
     while (running && gs->result == RESULT_ONGOING) {
         SDL_Event e;
@@ -280,6 +289,21 @@ void sdl_run(GameState *gs) {
                     case SDLK_RIGHT:  cam.x++; camera_clamp(&cam, gs); break;
                     case SDLK_UP:     cam.y--; camera_clamp(&cam, gs); break;
                     case SDLK_DOWN:   cam.y++; camera_clamp(&cam, gs); break;
+                    case SDLK_c:
+                        if (selected_id != -1) {
+                            Unit *u = unit_by_id(gs, selected_id);
+                            if (u && u->type == UNIT_TYPE_SETTLER) {
+                                if (game_settler_colonise(gs, u)) {
+                                    snprintf(status_msg, sizeof(status_msg), "Ville fondee !");
+                                    status_col = COL_GREEN;
+                                } else {
+                                    snprintf(status_msg, sizeof(status_msg), "Colonisation impossible");
+                                    status_col = COL_RED;
+                                }
+                            }
+                            selected_id = -1;
+                        }
+                        break;
                     case SDLK_RETURN:
                         selected_id = -1;
                         game_phase_production(gs);
@@ -296,14 +320,14 @@ void sdl_run(GameState *gs) {
             }
 
             if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT)
-                handle_click(gs, e.button.x, e.button.y, &selected_id, cam);
+                handle_click(gs, e.button.x, e.button.y, &selected_id, cam, status_msg);
         }
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
         draw_map(renderer, gs, cam);
         draw_entities(renderer, gs, cam);
-        draw_panel(renderer, font, gs, selected_id);
+        draw_panel(renderer, font, gs, selected_id, status_msg, status_col);
         if (selected_id != -1) {
             Unit *u = unit_by_id(gs, selected_id);
             if (u) draw_selection(renderer, u->x, u->y, cam);
