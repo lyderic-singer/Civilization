@@ -10,6 +10,8 @@
 #include <time.h>
 #include <sys/stat.h>
 
+#define CHECK(n, expr) if ((expr) != (n)) goto fail
+
 static const char *result_str(GameResult r) {
     switch (r) {
         case RESULT_WIN_SCI: return "VICTOIRE_SCI";
@@ -110,31 +112,33 @@ GameState *game_load(const char *path) {
     if (!gs) { fclose(f); return NULL; }
 
     char seed_hex[SEED_HEX_LEN + 1];
-    fscanf(f, "turn %d\n", &gs->turn);
-    fscanf(f, "turn_max %d\n", &gs->turn_max);
-    fscanf(f, "gold %d\n", &gs->gold);
-    fscanf(f, "n_barb_camps_initial %d\n", &gs->n_barbarian_camps_initial);
-    fscanf(f, "n_camps_destroyed %d\n", &gs->n_camps_destroyed);
-    fscanf(f, "barb_unit_count %d\n", &gs->barb_unit_count);
-    fscanf(f, "territorial_turns %d\n", &gs->territorial_consecutive_turns);
-    fscanf(f, "zero_prod_turns %d\n", &gs->zero_prod_turns);
-    fscanf(f, "next_unit_id %d\n", &gs->next_unit_id);
-    fscanf(f, "next_city_id %d\n", &gs->next_city_id);
-    fscanf(f, "next_camp_id %d\n", &gs->next_camp_id);
-    fscanf(f, "seed_hex %s\n", seed_hex);
-    fscanf(f, "result %d\n", (int *)&gs->result);
+    CHECK(1, fscanf(f, "turn %d\n", &gs->turn));
+    CHECK(1, fscanf(f, "turn_max %d\n", &gs->turn_max));
+    CHECK(1, fscanf(f, "gold %d\n", &gs->gold));
+    CHECK(1, fscanf(f, "n_barb_camps_initial %d\n", &gs->n_barbarian_camps_initial));
+    CHECK(1, fscanf(f, "n_camps_destroyed %d\n", &gs->n_camps_destroyed));
+    CHECK(1, fscanf(f, "barb_unit_count %d\n", &gs->barb_unit_count));
+    CHECK(1, fscanf(f, "territorial_turns %d\n", &gs->territorial_consecutive_turns));
+    CHECK(1, fscanf(f, "zero_prod_turns %d\n", &gs->zero_prod_turns));
+    CHECK(1, fscanf(f, "next_unit_id %d\n", &gs->next_unit_id));
+    CHECK(1, fscanf(f, "next_city_id %d\n", &gs->next_city_id));
+    CHECK(1, fscanf(f, "next_camp_id %d\n", &gs->next_camp_id));
+    CHECK(1, fscanf(f, "seed_hex %s\n", seed_hex));
+    CHECK(1, fscanf(f, "result %d\n", (int *)&gs->result));
     gs->seed = gen_seed(seed_hex);
 
     int W, H;
-    fscanf(f, "MAP %d %d\n", &W, &H);
+    CHECK(2, fscanf(f, "MAP %d %d\n", &W, &H));
     gs->map.width = W;
     gs->map.height = H;
     gs->map.tiles = malloc(H * sizeof(Tile *));
+    if (!gs->map.tiles) goto fail;
     for (int y = 0; y < H; y++) {
         gs->map.tiles[y] = malloc(W * sizeof(Tile));
+        if (!gs->map.tiles[y]) goto fail;
         for (int x = 0; x < W; x++) {
             int terrain, city_id, camp_id;
-            fscanf(f, "%d %d %d ", &terrain, &city_id, &camp_id);
+            CHECK(3, fscanf(f, "%d %d %d ", &terrain, &city_id, &camp_id));
             gs->map.tiles[y][x].terrain = (TerrainType)terrain;
             gs->map.tiles[y][x].city_id = city_id;
             gs->map.tiles[y][x].camp_id = camp_id;
@@ -143,36 +147,38 @@ GameState *game_load(const char *path) {
     }
 
     int researching, science_stored;
-    fscanf(f, "TECH %d %d\n", &researching, &science_stored);
+    CHECK(2, fscanf(f, "TECH %d %d\n", &researching, &science_stored));
     gs->tech.researching = researching;
     gs->tech.science_stored = science_stored;
     for (int i = 0; i < TECH_COUNT; i++)
-        fscanf(f, "%d ", &gs->tech.acquired[i]);
+        CHECK(1, fscanf(f, "%d ", &gs->tech.acquired[i]));
     fscanf(f, "\n");
     tech_apply_effects(gs);
 
     int nc;
-    fscanf(f, "CITIES %d\n", &nc);
+    CHECK(1, fscanf(f, "CITIES %d\n", &nc));
     for (int i = 0; i < nc; i++) {
         City *c = calloc(1, sizeof(City));
-        fscanf(f, "%d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+        if (!c) goto fail;
+        CHECK(13, fscanf(f, "%d %d %d %d %d %d %d %d %d %d %d %d %d\n",
                &c->id, &c->x, &c->y, &c->population,
                &c->food_stock, &c->prod_stock, &c->hp, &c->hp_max,
                &c->buildings, &c->founded_turn,
-               &c->project_type, &c->project_id, &c->took_damage_this_turn);
+               &c->project_type, &c->project_id, &c->took_damage_this_turn));
         c->next = gs->cities;
         gs->cities = c;
     }
 
     int nu;
-    fscanf(f, "UNITS %d\n", &nu);
+    CHECK(1, fscanf(f, "UNITS %d\n", &nu));
     for (int i = 0; i < nu; i++) {
         Unit *u = calloc(1, sizeof(Unit));
+        if (!u) goto fail;
         int type, owner;
-        fscanf(f, "%d %d %d %d %d %d %d %d %d %d %d %d\n",
+        CHECK(12, fscanf(f, "%d %d %d %d %d %d %d %d %d %d %d %d\n",
                &u->id, &type, &owner,
                &u->x, &u->y, &u->hp, &u->hp_max,
-               &u->attack, &u->defense, &u->pm_max, &u->pm_left, &u->maint);
+               &u->attack, &u->defense, &u->pm_max, &u->pm_left, &u->maint));
         u->type = (UnitType)type;
         u->owner = (UnitOwner)owner;
         u->next = gs->units;
@@ -180,10 +186,11 @@ GameState *game_load(const char *path) {
     }
 
     int ncamp;
-    fscanf(f, "CAMPS %d\n", &ncamp);
+    CHECK(1, fscanf(f, "CAMPS %d\n", &ncamp));
     for (int i = 0; i < ncamp; i++) {
         Camp *c = calloc(1, sizeof(Camp));
-        fscanf(f, "%d %d %d %d\n", &c->id, &c->x, &c->y, &c->alive);
+        if (!c) goto fail;
+        CHECK(4, fscanf(f, "%d %d %d %d\n", &c->id, &c->x, &c->y, &c->alive));
         c->next = gs->camps;
         gs->camps = c;
     }
@@ -193,4 +200,9 @@ GameState *game_load(const char *path) {
     units_reset_pm(gs, UNIT_OWNER_PLAYER);
     gs->result = RESULT_ONGOING;
     return gs;
+
+fail:
+    fclose(f);
+    free_game(gs);
+    return NULL;
 }
