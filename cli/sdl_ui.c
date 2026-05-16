@@ -507,6 +507,7 @@ void sdl_run(GameState *gs) {
     int running = 1;
     int selected_id = -1;
     int info_id = -1;
+    int last_saved_turn = -1;
     char info_text[64] = "";
     char status_msg[128] = "";
     SDL_Color status_col = COL_RED;
@@ -551,10 +552,14 @@ void sdl_run(GameState *gs) {
                         } else { cam.y++; camera_clamp(&cam, gs); }
                         break;
                     case SDLK_s:
-                        if (menu == MENU_NONE) {
+                        if (menu == MENU_NONE && gs->turn != last_saved_turn) {
                             game_save(gs);
+                            last_saved_turn = gs->turn;
                             snprintf(status_msg, sizeof(status_msg), "Partie sauvegardee !");
                             status_col = COL_GREEN;
+                        } else if (gs->turn == last_saved_turn) {
+                            snprintf(status_msg, sizeof(status_msg), "Deja sauvegarde ce tour");
+                            status_col = COL_GRAY;
                         }
                         break;
                     case SDLK_t:
