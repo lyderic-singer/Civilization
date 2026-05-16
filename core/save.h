@@ -8,5 +8,6 @@
 
 void scores_append(GameState *gs);
 void game_save(GameState *gs);
+GameState *game_load(const char *path);
 
 #endif

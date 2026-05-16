@@ -4,6 +4,8 @@
 #include "cities.h"
 #include "units.h"
 #include "lifecycle.h"
+#include "utils.h"
+#include "tech.h"
 #include <stdio.h>
 #include <time.h>
 #include <sys/stat.h>
@@ -98,4 +100,97 @@ void game_save(GameState *gs) {
 
     fclose(f);
     printf("Sauvegarde: %s\n", final_path);
+}
+
+GameState *game_load(const char *path) {
+    FILE *f = fopen(path, "r");
+    if (!f) return NULL;
+
+    GameState *gs = calloc(1, sizeof(GameState));
+    if (!gs) { fclose(f); return NULL; }
+
+    char seed_hex[SEED_HEX_LEN + 1];
+    fscanf(f, "turn %d\n", &gs->turn);
+    fscanf(f, "turn_max %d\n", &gs->turn_max);
+    fscanf(f, "gold %d\n", &gs->gold);
+    fscanf(f, "n_barb_camps_initial %d\n", &gs->n_barbarian_camps_initial);
+    fscanf(f, "n_camps_destroyed %d\n", &gs->n_camps_destroyed);
+    fscanf(f, "barb_unit_count %d\n", &gs->barb_unit_count);
+    fscanf(f, "territorial_turns %d\n", &gs->territorial_consecutive_turns);
+    fscanf(f, "zero_prod_turns %d\n", &gs->zero_prod_turns);
+    fscanf(f, "next_unit_id %d\n", &gs->next_unit_id);
+    fscanf(f, "next_city_id %d\n", &gs->next_city_id);
+    fscanf(f, "next_camp_id %d\n", &gs->next_camp_id);
+    fscanf(f, "seed_hex %s\n", seed_hex);
+    fscanf(f, "result %d\n", (int *)&gs->result);
+    gs->seed = gen_seed(seed_hex);
+
+    int W, H;
+    fscanf(f, "MAP %d %d\n", &W, &H);
+    gs->map.width = W;
+    gs->map.height = H;
+    gs->map.tiles = malloc(H * sizeof(Tile *));
+    for (int y = 0; y < H; y++) {
+        gs->map.tiles[y] = malloc(W * sizeof(Tile));
+        for (int x = 0; x < W; x++) {
+            int terrain, city_id, camp_id;
+            fscanf(f, "%d %d %d ", &terrain, &city_id, &camp_id);
+            gs->map.tiles[y][x].terrain = (TerrainType)terrain;
+            gs->map.tiles[y][x].city_id = city_id;
+            gs->map.tiles[y][x].camp_id = camp_id;
+        }
+        fscanf(f, "\n");
+    }
+
+    int researching, science_stored;
+    fscanf(f, "TECH %d %d\n", &researching, &science_stored);
+    gs->tech.researching = researching;
+    gs->tech.science_stored = science_stored;
+    for (int i = 0; i < TECH_COUNT; i++)
+        fscanf(f, "%d ", &gs->tech.acquired[i]);
+    fscanf(f, "\n");
+    tech_apply_effects(gs);
+
+    int nc;
+    fscanf(f, "CITIES %d\n", &nc);
+    for (int i = 0; i < nc; i++) {
+        City *c = calloc(1, sizeof(City));
+        fscanf(f, "%d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+               &c->id, &c->x, &c->y, &c->population,
+               &c->food_stock, &c->prod_stock, &c->hp, &c->hp_max,
+               &c->buildings, &c->founded_turn,
+               &c->project_type, &c->project_id, &c->took_damage_this_turn);
+        c->next = gs->cities;
+        gs->cities = c;
+    }
+
+    int nu;
+    fscanf(f, "UNITS %d\n", &nu);
+    for (int i = 0; i < nu; i++) {
+        Unit *u = calloc(1, sizeof(Unit));
+        int type, owner;
+        fscanf(f, "%d %d %d %d %d %d %d %d %d %d %d %d\n",
+               &u->id, &type, &owner,
+               &u->x, &u->y, &u->hp, &u->hp_max,
+               &u->attack, &u->defense, &u->pm_max, &u->pm_left, &u->maint);
+        u->type = (UnitType)type;
+        u->owner = (UnitOwner)owner;
+        u->next = gs->units;
+        gs->units = u;
+    }
+
+    int ncamp;
+    fscanf(f, "CAMPS %d\n", &ncamp);
+    for (int i = 0; i < ncamp; i++) {
+        Camp *c = calloc(1, sizeof(Camp));
+        fscanf(f, "%d %d %d %d\n", &c->id, &c->x, &c->y, &c->alive);
+        c->next = gs->camps;
+        gs->camps = c;
+    }
+
+    fclose(f);
+    cities_compute_yields(gs);
+    units_reset_pm(gs, UNIT_OWNER_PLAYER);
+    gs->result = RESULT_ONGOING;
+    return gs;
 }
