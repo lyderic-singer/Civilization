@@ -1,5 +1,6 @@
 #include "sdl_ui.h"
 #include "../core/turn.h"
+#include "../core/save.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <stdint.h>
@@ -357,7 +358,7 @@ static void draw_panel(SDL_Renderer *r, TTF_Font *font,
         draw_text(r, font, "[Haut/Bas=naviguer]  [Entree=choisir]  [Echap=annuler]",
                   PANEL_PAD, y2, COL_GRAY);
     else
-        draw_text(r, font, "[Entree=fin de tour]  [C=coloniser]  [T=tech]  [Fleches=scroll]  [Echap=quitter]",
+        draw_text(r, font, "[Entree=fin de tour]  [C=coloniser]  [T=tech]  [S=sauvegarder]  [Fleches=scroll]  [Echap=quitter]",
                   PANEL_PAD, y2, COL_GRAY);
 
     x = PANEL_PAD;
@@ -549,6 +550,13 @@ void sdl_run(GameState *gs) {
                             while (!tech_available(&gs->tech, menu_cursor) && menu_cursor != start);
                         } else { cam.y++; camera_clamp(&cam, gs); }
                         break;
+                    case SDLK_s:
+                        if (menu == MENU_NONE) {
+                            game_save(gs);
+                            snprintf(status_msg, sizeof(status_msg), "Partie sauvegardee !");
+                            status_col = COL_GREEN;
+                        }
+                        break;
                     case SDLK_t:
                         if (menu == MENU_NONE) {
                             menu = MENU_TECH;
@@ -634,6 +642,7 @@ void sdl_run(GameState *gs) {
     }
 
     if (gs->result != RESULT_ONGOING) {
+        scores_append(gs);
         SDL_SetRenderDrawColor(renderer, COL_BLACK.r, COL_BLACK.g, COL_BLACK.b, COL_BLACK.a);
         SDL_RenderClear(renderer);
         draw_end_screen(renderer, font, gs);
