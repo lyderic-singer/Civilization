@@ -171,7 +171,20 @@ static void draw_legend_item(SDL_Renderer *r, TTF_Font *font,
     *x += FONT_SIZE - 2 + text_width(font, label) + GAP;
 }
 
-static void draw_menu_city(SDL_Renderer *r, TTF_Font *font, int cursor, City *city) {
+static int city_item_avail(GameState *gs, City *city, int idx) {
+    MenuItem item = CITY_ITEMS[idx];
+    if (item.type == PROJECT_UNIT)
+        return city_can_produce_unit(gs, city, (UnitType)item.id);
+    return city_can_build(gs, city, item.id);
+}
+
+static int city_item_built(City *city, int idx) {
+    MenuItem item = CITY_ITEMS[idx];
+    if (item.type != PROJECT_BUILDING) return 0;
+    return (city->buildings & item.id) ? 1 : 0;
+}
+
+static void draw_menu_city(SDL_Renderer *r, TTF_Font *font, int cursor, City *city, GameState *gs) {
     int w = 300;
     int h = PANEL_PAD + LINE_H + LINE_H + CITY_ITEMS_N * LINE_H + PANEL_PAD;
     int mx = (SCREEN_W - w) / 2;
@@ -198,7 +211,13 @@ static void draw_menu_city(SDL_Renderer *r, TTF_Font *font, int cursor, City *ci
     }
 
     for (int i = 0; i < CITY_ITEMS_N; i++) {
-        SDL_Color col = (i == cursor) ? COL_WHITE : COL_GRAY;
+        SDL_Color col;
+        if (city_item_built(city, i))
+            col = COL_GREEN;
+        else if (city_item_avail(gs, city, i))
+            col = (i == cursor) ? COL_WHITE : COL_YELLOW;
+        else
+            col = COL_GRAY;
         draw_text(r, font, CITY_ITEMS[i].label, mx + PANEL_PAD,
                   my + PANEL_PAD + (i + 2) * LINE_H, col);
     }
@@ -397,8 +416,10 @@ void sdl_run(GameState *gs) {
                     case SDLK_LEFT:   if (menu == MENU_NONE) { cam.x--; camera_clamp(&cam, gs); } break;
                     case SDLK_RIGHT:  if (menu == MENU_NONE) { cam.x++; camera_clamp(&cam, gs); } break;
                     case SDLK_UP:
-                        if (menu == MENU_CITY) {
-                            menu_cursor = (menu_cursor - 1 + CITY_ITEMS_N) % CITY_ITEMS_N;
+                        if (menu == MENU_CITY && menu_city) {
+                            int start = menu_cursor;
+                            do { menu_cursor = (menu_cursor - 1 + CITY_ITEMS_N) % CITY_ITEMS_N; }
+                            while (!city_item_avail(gs, menu_city, menu_cursor) && menu_cursor != start);
                         } else if (menu == MENU_TECH) {
                             int start = menu_cursor;
                             do { menu_cursor = (menu_cursor - 1 + TECH_COUNT) % TECH_COUNT; }
@@ -406,8 +427,10 @@ void sdl_run(GameState *gs) {
                         } else { cam.y--; camera_clamp(&cam, gs); }
                         break;
                     case SDLK_DOWN:
-                        if (menu == MENU_CITY) {
-                            menu_cursor = (menu_cursor + 1) % CITY_ITEMS_N;
+                        if (menu == MENU_CITY && menu_city) {
+                            int start = menu_cursor;
+                            do { menu_cursor = (menu_cursor + 1) % CITY_ITEMS_N; }
+                            while (!city_item_avail(gs, menu_city, menu_cursor) && menu_cursor != start);
                         } else if (menu == MENU_TECH) {
                             int start = menu_cursor;
                             do { menu_cursor = (menu_cursor + 1) % TECH_COUNT; }
@@ -437,9 +460,14 @@ void sdl_run(GameState *gs) {
                         break;
                     case SDLK_RETURN:
                         if (menu == MENU_CITY && menu_city) {
-                            city_set_project(menu_city, CITY_ITEMS[menu_cursor].type, CITY_ITEMS[menu_cursor].id);
-                            snprintf(status_msg, sizeof(status_msg), "Projet: %s", CITY_ITEMS[menu_cursor].label);
-                            status_col = COL_GREEN;
+                            if (city_item_avail(gs, menu_city, menu_cursor)) {
+                                city_set_project(menu_city, CITY_ITEMS[menu_cursor].type, CITY_ITEMS[menu_cursor].id);
+                                snprintf(status_msg, sizeof(status_msg), "Projet: %s", CITY_ITEMS[menu_cursor].label);
+                                status_col = COL_GREEN;
+                            } else {
+                                snprintf(status_msg, sizeof(status_msg), "Option indisponible");
+                                status_col = COL_RED;
+                            }
                             menu = MENU_NONE;
                             break;
                         }
@@ -483,7 +511,7 @@ void sdl_run(GameState *gs) {
         draw_map(renderer, gs, cam);
         draw_entities(renderer, gs, cam);
         draw_panel(renderer, font, gs, selected_id, status_msg, status_col, menu);
-        if (menu == MENU_CITY) draw_menu_city(renderer, font, menu_cursor, menu_city);
+        if (menu == MENU_CITY) draw_menu_city(renderer, font, menu_cursor, menu_city, gs);
         if (menu == MENU_TECH) draw_menu_tech(renderer, font, menu_cursor, gs);
         if (selected_id != -1) {
             Unit *u = unit_by_id(gs, selected_id);
