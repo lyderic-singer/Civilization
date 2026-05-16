@@ -168,9 +168,9 @@ static void draw_legend_item(SDL_Renderer *r, TTF_Font *font,
     *x += FONT_SIZE - 2 + text_width(font, label) + GAP;
 }
 
-static void draw_menu_city(SDL_Renderer *r, TTF_Font *font, int cursor) {
+static void draw_menu_city(SDL_Renderer *r, TTF_Font *font, int cursor, City *city) {
     int w = 300;
-    int h = PANEL_PAD + LINE_H + CITY_ITEMS_N * LINE_H + PANEL_PAD;
+    int h = PANEL_PAD + LINE_H + LINE_H + CITY_ITEMS_N * LINE_H + PANEL_PAD;
     int mx = (SCREEN_W - w) / 2;
     int my = (SCREEN_H - h) / 2;
 
@@ -181,10 +181,23 @@ static void draw_menu_city(SDL_Renderer *r, TTF_Font *font, int cursor) {
     SDL_RenderDrawRect(r, &bg);
 
     draw_text(r, font, "Projet de construction", mx + PANEL_PAD, my + PANEL_PAD, COL_WHITE);
+
+    if (city->project_type != PROJECT_NONE) {
+        const char *cur = "?";
+        for (int i = 0; i < CITY_ITEMS_N; i++)
+            if (CITY_ITEMS[i].type == city->project_type && CITY_ITEMS[i].id == city->project_id)
+                cur = CITY_ITEMS[i].label;
+        char buf[64];
+        snprintf(buf, sizeof(buf), "En cours: %s", cur);
+        draw_text(r, font, buf, mx + PANEL_PAD, my + PANEL_PAD + LINE_H, COL_CYAN);
+    } else {
+        draw_text(r, font, "Aucun projet", mx + PANEL_PAD, my + PANEL_PAD + LINE_H, COL_GRAY);
+    }
+
     for (int i = 0; i < CITY_ITEMS_N; i++) {
         SDL_Color col = (i == cursor) ? COL_WHITE : COL_GRAY;
         draw_text(r, font, CITY_ITEMS[i].label, mx + PANEL_PAD,
-                  my + PANEL_PAD + (i + 1) * LINE_H, col);
+                  my + PANEL_PAD + (i + 2) * LINE_H, col);
     }
 }
 
@@ -370,6 +383,8 @@ void sdl_run(GameState *gs) {
                     case SDLK_RETURN:
                         if (menu == MENU_CITY && menu_city) {
                             city_set_project(menu_city, CITY_ITEMS[menu_cursor].type, CITY_ITEMS[menu_cursor].id);
+                            snprintf(status_msg, sizeof(status_msg), "Projet: %s", CITY_ITEMS[menu_cursor].label);
+                            status_col = COL_GREEN;
                             menu = MENU_NONE;
                             break;
                         }
@@ -398,7 +413,7 @@ void sdl_run(GameState *gs) {
         draw_map(renderer, gs, cam);
         draw_entities(renderer, gs, cam);
         draw_panel(renderer, font, gs, selected_id, status_msg, status_col, menu);
-        if (menu == MENU_CITY) draw_menu_city(renderer, font, menu_cursor);
+        if (menu == MENU_CITY) draw_menu_city(renderer, font, menu_cursor, menu_city);
         if (selected_id != -1) {
             Unit *u = unit_by_id(gs, selected_id);
             if (u) draw_selection(renderer, u->x, u->y, cam);
