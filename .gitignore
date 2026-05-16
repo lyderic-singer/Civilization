@@ -1,7 +1,7 @@
 # github .gitignore C project
 # Prerequisites
 *.d
-
+saves
 # Object files
 *.o
 *.ko
