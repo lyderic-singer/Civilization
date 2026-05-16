@@ -6,6 +6,21 @@
 
 typedef struct { uint8_t r, g, b; } Color;
 typedef struct { int x, y; } Camera;
+typedef enum { MENU_NONE, MENU_CITY, MENU_TECH } MenuState;
+
+typedef struct { int type; int id; const char *label; } MenuItem;
+
+static const MenuItem CITY_ITEMS[] = {
+    { PROJECT_UNIT, UNIT_TYPE_SETTLER, "Colon" },
+    { PROJECT_UNIT, UNIT_TYPE_WARRIOR, "Guerrier" },
+    { PROJECT_BUILDING, BUILDING_GRANARY, "Grenier" },
+    { PROJECT_BUILDING, BUILDING_WORKSHOP, "Atelier" },
+    { PROJECT_BUILDING, BUILDING_LIBRARY, "Bibliotheque" },
+    { PROJECT_BUILDING, BUILDING_MARKET, "Marche" },
+    { PROJECT_BUILDING, BUILDING_BARRACKS, "Caserne" },
+    { PROJECT_BUILDING, BUILDING_WALL, "Muraille" },
+};
+#define CITY_ITEMS_N (int)(sizeof(CITY_ITEMS) / sizeof(CITY_ITEMS[0]))
 
 static const Color TERRAIN_COLORS[TERRAIN_COUNT] = {
     [TERRAIN_PLAIN] = { 144, 200, 100 },
@@ -89,13 +104,23 @@ static void draw_selection(SDL_Renderer *r, int tx, int ty, Camera cam) {
 }
 
 static void handle_click(GameState *gs, int px, int py, int *selected_id, Camera cam,
-                         char *status_msg) {
+                         char *status_msg, MenuState *menu, City **menu_city) {
     status_msg[0] = '\0';
+    *menu = MENU_NONE;
     int tx = px / TILE_SIZE + cam.x;
     int ty = py / TILE_SIZE + cam.y;
 
     if (tx < 0 || tx >= gs->map.width || ty < 0 || ty >= gs->map.height) return;
     if (py >= SCREEN_H) return;
+
+    for (City *c = gs->cities; c; c = c->next) {
+        if (c->x == tx && c->y == ty) {
+            *menu = MENU_CITY;
+            *menu_city = c;
+            *selected_id = -1;
+            return;
+        }
+    }
 
     Unit *pu = unit_at(gs, tx, ty, UNIT_OWNER_PLAYER);
 
@@ -143,9 +168,30 @@ static void draw_legend_item(SDL_Renderer *r, TTF_Font *font,
     *x += FONT_SIZE - 2 + text_width(font, label) + GAP;
 }
 
+static void draw_menu_city(SDL_Renderer *r, TTF_Font *font, int cursor) {
+    int w = 300;
+    int h = PANEL_PAD + LINE_H + CITY_ITEMS_N * LINE_H + PANEL_PAD;
+    int mx = (SCREEN_W - w) / 2;
+    int my = (SCREEN_H - h) / 2;
+
+    SDL_Rect bg = { mx, my, w, h };
+    SDL_SetRenderDrawColor(r, 20, 20, 30, 255);
+    SDL_RenderFillRect(r, &bg);
+    SDL_SetRenderDrawColor(r, 80, 80, 100, 255);
+    SDL_RenderDrawRect(r, &bg);
+
+    draw_text(r, font, "Projet de construction", mx + PANEL_PAD, my + PANEL_PAD, COL_WHITE);
+    for (int i = 0; i < CITY_ITEMS_N; i++) {
+        SDL_Color col = (i == cursor) ? COL_WHITE : COL_GRAY;
+        draw_text(r, font, CITY_ITEMS[i].label, mx + PANEL_PAD,
+                  my + PANEL_PAD + (i + 1) * LINE_H, col);
+    }
+}
+
 static void draw_panel(SDL_Renderer *r, TTF_Font *font,
                        GameState *gs, int selected_id,
-                       const char *status_msg, SDL_Color status_col) {
+                       const char *status_msg, SDL_Color status_col,
+                       MenuState menu) {
     SDL_SetRenderDrawColor(r, 20, 20, 30, 255);
     SDL_Rect bg = { 0, SCREEN_H, SCREEN_W, PANEL_H };
     SDL_RenderFillRect(r, &bg);
@@ -185,8 +231,12 @@ static void draw_panel(SDL_Renderer *r, TTF_Font *font,
     if (status_msg[0])
         draw_text(r, font, status_msg, x, y1, status_col);
 
-    draw_text(r, font, "[Entree=fin de tour]  [C=coloniser]  [T=tech]  [Fleches=scroll]  [Echap=quitter]",
-              PANEL_PAD, y2, COL_GRAY);
+    if (menu != MENU_NONE)
+        draw_text(r, font, "[Haut/Bas=naviguer]  [Entree=choisir]  [Echap=annuler]",
+                  PANEL_PAD, y2, COL_GRAY);
+    else
+        draw_text(r, font, "[Entree=fin de tour]  [C=coloniser]  [T=tech]  [Fleches=scroll]  [Echap=quitter]",
+                  PANEL_PAD, y2, COL_GRAY);
 
     x = PANEL_PAD;
     draw_legend_item(r, font, &x, y3, COL_CITY,"Ville");
@@ -276,6 +326,9 @@ void sdl_run(GameState *gs) {
     int selected_id = -1;
     char status_msg[128] = "";
     SDL_Color status_col = COL_RED;
+    MenuState menu = MENU_NONE;
+    City *menu_city = NULL;
+    int menu_cursor = 0;
 
     while (running && gs->result == RESULT_ONGOING) {
         SDL_Event e;
@@ -284,11 +337,21 @@ void sdl_run(GameState *gs) {
 
             if (e.type == SDL_KEYDOWN) {
                 switch (e.key.keysym.sym) {
-                    case SDLK_ESCAPE: running = 0; break;
-                    case SDLK_LEFT:   cam.x--; camera_clamp(&cam, gs); break;
-                    case SDLK_RIGHT:  cam.x++; camera_clamp(&cam, gs); break;
-                    case SDLK_UP:     cam.y--; camera_clamp(&cam, gs); break;
-                    case SDLK_DOWN:   cam.y++; camera_clamp(&cam, gs); break;
+                    case SDLK_ESCAPE:
+                        if (menu != MENU_NONE) menu = MENU_NONE;
+                        else running = 0;
+                        break;
+                    default: break;
+                    case SDLK_LEFT:   if (menu == MENU_NONE) { cam.x--; camera_clamp(&cam, gs); } break;
+                    case SDLK_RIGHT:  if (menu == MENU_NONE) { cam.x++; camera_clamp(&cam, gs); } break;
+                    case SDLK_UP:
+                        if (menu != MENU_NONE) { menu_cursor--; if (menu_cursor < 0) menu_cursor = CITY_ITEMS_N - 1; }
+                        else { cam.y--; camera_clamp(&cam, gs); }
+                        break;
+                    case SDLK_DOWN:
+                        if (menu != MENU_NONE) { menu_cursor++; if (menu_cursor >= CITY_ITEMS_N) menu_cursor = 0; }
+                        else { cam.y++; camera_clamp(&cam, gs); }
+                        break;
                     case SDLK_c:
                         if (selected_id != -1) {
                             Unit *u = unit_by_id(gs, selected_id);
@@ -305,6 +368,11 @@ void sdl_run(GameState *gs) {
                         }
                         break;
                     case SDLK_RETURN:
+                        if (menu == MENU_CITY && menu_city) {
+                            city_set_project(menu_city, CITY_ITEMS[menu_cursor].type, CITY_ITEMS[menu_cursor].id);
+                            menu = MENU_NONE;
+                            break;
+                        }
                         selected_id = -1;
                         game_phase_production(gs);
                         cities_grow(gs);
@@ -319,15 +387,18 @@ void sdl_run(GameState *gs) {
                 }
             }
 
-            if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT)
-                handle_click(gs, e.button.x, e.button.y, &selected_id, cam, status_msg);
+            if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
+                handle_click(gs, e.button.x, e.button.y, &selected_id, cam, status_msg, &menu, &menu_city);
+                if (menu == MENU_CITY) menu_cursor = 0;
+            }
         }
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
         draw_map(renderer, gs, cam);
         draw_entities(renderer, gs, cam);
-        draw_panel(renderer, font, gs, selected_id, status_msg, status_col);
+        draw_panel(renderer, font, gs, selected_id, status_msg, status_col, menu);
+        if (menu == MENU_CITY) draw_menu_city(renderer, font, menu_cursor);
         if (selected_id != -1) {
             Unit *u = unit_by_id(gs, selected_id);
             if (u) draw_selection(renderer, u->x, u->y, cam);
