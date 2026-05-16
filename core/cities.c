@@ -143,6 +143,7 @@ void cities_accumulate_terrain(GameState *gs) {
 }
 
 void city_apply_bonuses(GameState *gs, City *c) {
+    c->yield_science += CITY_BASE_SCIENCE;
     if (c->buildings & BUILDING_GRANARY) c->yield_food += BUILDING_GRANARY_FOOD;
     if (c->buildings & BUILDING_WORKSHOP) c->yield_prod += BUILDING_WORKSHOP_PROD;
     if (c->buildings & BUILDING_LIBRARY) c->yield_science += BUILDING_LIBRARY_SCI;

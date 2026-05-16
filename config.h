@@ -61,6 +61,7 @@
 #define CITY_GROWTH_BASE        20
 #define CITY_GROWTH_PER_POP     10  /* threshold = 20 + 10*pop */
 #define CITY_HP_PER_POP         10
+#define CITY_BASE_SCIENCE       2
 #define CITY_DEFENSE_BASE       20
 #define CITY_DEFENSE_WALL       30
 #define CITY_HEAL_DIVISOR       2   /* restore HP/2 per turn if no damage */
