@@ -110,7 +110,7 @@ GameState *gen_game(int width, int height, int turns, int n_barb_camps, Seed see
     gs->n_barbarian_camps_initial = n_barb_camps;
     gs->n_camps_destroyed = 0;
     gs->barb_unit_count = 0;
-    gs->gold = 0;
+    gs->gold = 10;
     gs->territorial_consecutive_turns = 0;
     gs->zero_prod_turns = 0;
     gs->result = RESULT_ONGOING;
