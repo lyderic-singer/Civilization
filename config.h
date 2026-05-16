@@ -113,7 +113,7 @@
 #define UNIT_WARRIOR_PM      3
 
 /* ==== Technologies ==== */
-#define TECH_COUNT 9
+#define TECH_COUNT 8
 
 #define TECH_ID_HUNTING    0
 #define TECH_ID_FARMING    1
