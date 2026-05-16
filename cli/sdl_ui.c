@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 typedef struct { uint8_t r, g, b; } Color;
+typedef struct { int x, y; } Camera;
 
 static const Color TERRAIN_COLORS[TERRAIN_COUNT] = {
     [TERRAIN_PLAIN] = { 144, 200, 100 },
@@ -26,6 +27,17 @@ static const SDL_Color COL_SETTLER = { 240, 220,  50, 255 };
 static const SDL_Color COL_WARRIOR = {  50, 150, 240, 255 };
 static const SDL_Color COL_SELECT = { 255, 255,   0, 255 };
 
+static void camera_clamp(Camera *cam, GameState *gs) {
+    int tiles_x = SCREEN_W / TILE_SIZE;
+    int tiles_y = SCREEN_H / TILE_SIZE;
+    if (cam->x < 0) cam->x = 0;
+    if (cam->y < 0) cam->y = 0;
+    int max_x = gs->map.width  - tiles_x;
+    int max_y = gs->map.height - tiles_y;
+    if (max_x <= 0) cam->x = 0; else if (cam->x > max_x) cam->x = max_x;
+    if (max_y <= 0) cam->y = 0; else if (cam->y > max_y) cam->y = max_y;
+}
+
 static void draw_tile(SDL_Renderer *r, int x, int y, TerrainType t) {
     Color c = TERRAIN_COLORS[t];
     SDL_Rect rect = { x, y, TILE_SIZE, TILE_SIZE };
@@ -35,17 +47,27 @@ static void draw_tile(SDL_Renderer *r, int x, int y, TerrainType t) {
     SDL_RenderDrawRect(r, &rect);
 }
 
-static void draw_map(SDL_Renderer *r, GameState *gs) {
-    for (int ty = 0; ty < gs->map.height; ty++)
-        for (int tx = 0; tx < gs->map.width; tx++)
-            draw_tile(r, tx * TILE_SIZE, ty * TILE_SIZE,
-                      gs->map.tiles[ty][tx].terrain);
+static void draw_map(SDL_Renderer *r, GameState *gs, Camera cam) {
+    int tiles_x = SCREEN_W / TILE_SIZE;
+    int tiles_y = SCREEN_H / TILE_SIZE;
+    for (int sy = 0; sy <= tiles_y; sy++) {
+        for (int sx = 0; sx <= tiles_x; sx++) {
+            int mx = sx + cam.x;
+            int my = sy + cam.y;
+            if (mx < 0 || mx >= gs->map.width || my < 0 || my >= gs->map.height) continue;
+            draw_tile(r, sx * TILE_SIZE, sy * TILE_SIZE,
+                      gs->map.tiles[my][mx].terrain);
+        }
+    }
 }
 
-static void draw_entity(SDL_Renderer *r, int tx, int ty, SDL_Color color) {
+static void draw_entity(SDL_Renderer *r, int tx, int ty, SDL_Color color, Camera cam) {
+    int sx = (tx - cam.x) * TILE_SIZE;
+    int sy = (ty - cam.y) * TILE_SIZE;
+    if (sx < 0 || sx >= SCREEN_W || sy < 0 || sy >= SCREEN_H) return;
     SDL_Rect rect = {
-        tx * TILE_SIZE + MARGIN_SIZE,
-        ty * TILE_SIZE + MARGIN_SIZE,
+        sx + MARGIN_SIZE,
+        sy + MARGIN_SIZE,
         TILE_SIZE - MARGIN_SIZE * 2,
         TILE_SIZE - MARGIN_SIZE * 2
     };
@@ -53,20 +75,23 @@ static void draw_entity(SDL_Renderer *r, int tx, int ty, SDL_Color color) {
     SDL_RenderFillRect(r, &rect);
 }
 
-static void draw_selection(SDL_Renderer *r, int tx, int ty) {
-    SDL_Rect rect = { tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE };
+static void draw_selection(SDL_Renderer *r, int tx, int ty, Camera cam) {
+    int sx = (tx - cam.x) * TILE_SIZE;
+    int sy = (ty - cam.y) * TILE_SIZE;
+    if (sx < 0 || sx >= SCREEN_W || sy < 0 || sy >= SCREEN_H) return;
+    SDL_Rect rect = { sx, sy, TILE_SIZE, TILE_SIZE };
     SDL_SetRenderDrawColor(r, COL_SELECT.r, COL_SELECT.g, COL_SELECT.b, COL_SELECT.a);
     SDL_RenderDrawRect(r, &rect);
     SDL_Rect inner = { rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2 };
     SDL_RenderDrawRect(r, &inner);
 }
 
-static void handle_click(GameState *gs, int px, int py, int *selected_id) {
-    int tx = px / TILE_SIZE;
-    int ty = py / TILE_SIZE;
+static void handle_click(GameState *gs, int px, int py, int *selected_id, Camera cam) {
+    int tx = px / TILE_SIZE + cam.x;
+    int ty = py / TILE_SIZE + cam.y;
 
-    if (tx < 0 || tx >= gs->map.width || ty < 0 || ty >= gs->map.height)
-        return;
+    if (tx < 0 || tx >= gs->map.width || ty < 0 || ty >= gs->map.height) return;
+    if (py >= SCREEN_H) return;
 
     Unit *pu = unit_at(gs, tx, ty, UNIT_OWNER_PLAYER);
 
@@ -99,6 +124,12 @@ static int text_width(TTF_Font *font, const char *text) {
     return w;
 }
 
+static void draw_stat(SDL_Renderer *r, TTF_Font *font,
+                      int *x, int y, const char *text, SDL_Color color) {
+    draw_text(r, font, text, *x, y, color);
+    *x += text_width(font, text) + GAP;
+}
+
 static void draw_legend_item(SDL_Renderer *r, TTF_Font *font,
                              int *x, int y, SDL_Color color, const char *label) {
     SDL_Rect sq = { *x, y + 3, FONT_SIZE - 6, FONT_SIZE - 6 };
@@ -108,23 +139,17 @@ static void draw_legend_item(SDL_Renderer *r, TTF_Font *font,
     *x += FONT_SIZE - 2 + text_width(font, label) + GAP;
 }
 
-static void draw_stat(SDL_Renderer *r, TTF_Font *font,
-                      int *x, int y, const char *text, SDL_Color color) {
-    draw_text(r, font, text, *x, y, color);
-    *x += text_width(font, text) + GAP;
-}
-
 static void draw_panel(SDL_Renderer *r, TTF_Font *font,
-                       GameState *gs, int selected_id, int screen_w, int screen_h) {
+                       GameState *gs, int selected_id) {
     SDL_SetRenderDrawColor(r, 20, 20, 30, 255);
-    SDL_Rect bg = { 0, screen_h - PANEL_H, screen_w, PANEL_H };
+    SDL_Rect bg = { 0, SCREEN_H, SCREEN_W, PANEL_H };
     SDL_RenderFillRect(r, &bg);
 
     SDL_SetRenderDrawColor(r, 80, 80, 100, 255);
-    SDL_RenderDrawLine(r, 0, screen_h - PANEL_H, screen_w, screen_h - PANEL_H);
+    SDL_RenderDrawLine(r, 0, SCREEN_H, SCREEN_W, SCREEN_H);
 
     char buf[128];
-    int y1 = screen_h - PANEL_H + PANEL_PAD;
+    int y1 = SCREEN_H + PANEL_PAD;
     int y2 = y1 + LINE_H;
     int y3 = y2 + LINE_H;
     int x = PANEL_PAD;
@@ -153,32 +178,32 @@ static void draw_panel(SDL_Renderer *r, TTF_Font *font,
         }
     }
 
-    draw_text(r, font, "[Entree=fin de tour]  [C=coloniser]  [T=tech]  [Echap=quitter]",
+    draw_text(r, font, "[Entree=fin de tour]  [C=coloniser]  [T=tech]  [Fleches=scroll]  [Echap=quitter]",
               PANEL_PAD, y2, COL_GRAY);
 
     x = PANEL_PAD;
-    draw_legend_item(r, font, &x, y3, COL_CITY, "Ville");
-    draw_legend_item(r, font, &x, y3, COL_CAMP, "Camp");
-    draw_legend_item(r, font, &x, y3, COL_BARB, "Barbare");
+    draw_legend_item(r, font, &x, y3, COL_CITY,"Ville");
+    draw_legend_item(r, font, &x, y3, COL_CAMP,"Camp");
+    draw_legend_item(r, font, &x, y3, COL_BARB,"Barbare");
     draw_legend_item(r, font, &x, y3, COL_SETTLER, "Colon");
     draw_legend_item(r, font, &x, y3, COL_WARRIOR, "Guerrier");
 }
 
-static void draw_entities(SDL_Renderer *r, GameState *gs) {
+static void draw_entities(SDL_Renderer *r, GameState *gs, Camera cam) {
     for (City *c = gs->cities; c; c = c->next)
-        draw_entity(r, c->x, c->y, COL_CITY);
+        draw_entity(r, c->x, c->y, COL_CITY, cam);
 
     for (Camp *c = gs->camps; c; c = c->next)
         if (c->alive)
-            draw_entity(r, c->x, c->y, COL_CAMP);
+            draw_entity(r, c->x, c->y, COL_CAMP, cam);
 
     for (Unit *u = gs->units; u; u = u->next) {
         if (u->owner == UNIT_OWNER_BARB)
-            draw_entity(r, u->x, u->y, COL_BARB);
+            draw_entity(r, u->x, u->y, COL_BARB, cam);
         else if (u->type == UNIT_TYPE_SETTLER)
-            draw_entity(r, u->x, u->y, COL_SETTLER);
+            draw_entity(r, u->x, u->y, COL_SETTLER, cam);
         else
-            draw_entity(r, u->x, u->y, COL_WARRIOR);
+            draw_entity(r, u->x, u->y, COL_WARRIOR, cam);
     }
 }
 
@@ -195,13 +220,10 @@ void sdl_run(GameState *gs) {
         return;
     }
 
-    int screen_w = gs->map.width  * TILE_SIZE;
-    int screen_h = gs->map.height * TILE_SIZE + PANEL_H;
-
     SDL_Window *win = SDL_CreateWindow(
         "Early Civilization",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        screen_w, screen_h,
+        SCREEN_W, SCREEN_H + PANEL_H,
         SDL_WINDOW_SHOWN
     );
     if (!win) {
@@ -225,6 +247,8 @@ void sdl_run(GameState *gs) {
         return;
     }
 
+
+
     TTF_Font *font = TTF_OpenFont(FONT_PATH, FONT_SIZE);
     if (!font) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -239,6 +263,8 @@ void sdl_run(GameState *gs) {
     cities_compute_yields(gs);
     units_reset_pm(gs, UNIT_OWNER_PLAYER);
 
+    Camera cam = { 0, 0 };
+
     int running     = 1;
     int selected_id = -1;
 
@@ -249,9 +275,11 @@ void sdl_run(GameState *gs) {
 
             if (e.type == SDL_KEYDOWN) {
                 switch (e.key.keysym.sym) {
-                    case SDLK_ESCAPE:
-                        running = 0;
-                        break;
+                    case SDLK_ESCAPE: running = 0; break;
+                    case SDLK_LEFT:   cam.x--; camera_clamp(&cam, gs); break;
+                    case SDLK_RIGHT:  cam.x++; camera_clamp(&cam, gs); break;
+                    case SDLK_UP:     cam.y--; camera_clamp(&cam, gs); break;
+                    case SDLK_DOWN:   cam.y++; camera_clamp(&cam, gs); break;
                     case SDLK_RETURN:
                         selected_id = -1;
                         game_phase_production(gs);
@@ -268,17 +296,17 @@ void sdl_run(GameState *gs) {
             }
 
             if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT)
-                handle_click(gs, e.button.x, e.button.y, &selected_id);
+                handle_click(gs, e.button.x, e.button.y, &selected_id, cam);
         }
 
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
-        draw_map(renderer, gs);
-        draw_entities(renderer, gs);
-        draw_panel(renderer, font, gs, selected_id, screen_w, screen_h);
+        draw_map(renderer, gs, cam);
+        draw_entities(renderer, gs, cam);
+        draw_panel(renderer, font, gs, selected_id);
         if (selected_id != -1) {
             Unit *u = unit_by_id(gs, selected_id);
-            if (u) draw_selection(renderer, u->x, u->y);
+            if (u) draw_selection(renderer, u->x, u->y, cam);
             else   selected_id = -1;
         }
         SDL_RenderPresent(renderer);

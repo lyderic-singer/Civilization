@@ -7,8 +7,11 @@
 #include <SDL2/SDL_ttf.h>
 #include <stdint.h>
 
-#define TILE_SIZE 32
-#define MARGIN_SIZE 6
+#define SCREEN_W 1280
+#define SCREEN_H 720
+#define TARGET_TILES_X 40
+#define TILE_SIZE (SCREEN_W / TARGET_TILES_X)
+#define MARGIN_SIZE (TILE_SIZE / 6)
 #define FONT_SIZE 24
 #define LINE_H (FONT_SIZE + 8)
 #define PANEL_PAD 10
