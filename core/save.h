@@ -7,5 +7,6 @@
 #define SAVES_DIR "saves"
 
 void scores_append(GameState *gs);
+void game_save(GameState *gs);
 
 #endif

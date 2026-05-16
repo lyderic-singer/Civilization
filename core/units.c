@@ -75,6 +75,12 @@ int units_count(GameState *gs, UnitOwner owner) {
     return n;
 }
 
+int units_count_all(GameState *gs) {
+    int n = 0;
+    for (Unit *u = gs->units; u; u = u->next) n++;
+    return n;
+}
+
 int tile_move_cost(GameState *gs, int x, int y) {
     if (x < 0 || x >= gs->map.width || y < 0 || y >= gs->map.height)
         return 0;

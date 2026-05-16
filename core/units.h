@@ -17,5 +17,6 @@ int  unit_cost(UnitType t);
 int  unit_maint(UnitType t);
 const char *unit_type_name(UnitType t);
 void unit_goto(GameState *gs, Unit *u, int tx, int ty);
+int units_count_all(GameState *gs);
 
 #endif

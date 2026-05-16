@@ -69,6 +69,12 @@ void gen_first_city(GameState *gs) {
     unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, sx, sy);
 }
 
+int camps_count(GameState *gs) {
+    int n = 0;
+    for (Camp *c = gs->camps; c; c = c->next) n++;
+    return n;
+}
+
 void gen_camps(GameState *gs, int n) {
     int W = gs->map.width;
     int H = gs->map.height;
