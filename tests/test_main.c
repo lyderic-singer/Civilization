@@ -1,4 +1,5 @@
 #include "../core/core.h"
+#include "../core/turn.h"
 #include <stdio.h>
 
 static int passes = 0;
@@ -34,11 +35,46 @@ static void test_seed_determinism(void) {
     free_game(gs2);
 }
 
+static void test_colonise(void) {
+    Seed s = gen_seed("46513216549845");
+    GameState *gs = gen_game(30, 30, 100, 0, s);
+
+    int cx = gs->cities->x;
+    int cy = gs->cities->y;
+    int tx = (cx + 10 < 30) ? cx + 10 : cx - 10;
+    int ty = (cy + 10 < 30) ? cy + 10 : cy - 10;
+
+    gs->map.tiles[ty][tx].terrain = TERRAIN_PLAIN;
+    gs->map.tiles[ty][tx].city_id = -1;
+    gs->map.tiles[ty][tx].camp_id = -1;
+
+    int city_count_before = cities_count(gs);
+    Unit *settler = unit_create(gs, UNIT_TYPE_SETTLER, UNIT_OWNER_PLAYER, tx, ty);
+
+    ASSERT(game_settler_colonise(gs, settler) == 1);
+    ASSERT(cities_count(gs) == city_count_before + 1);
+    ASSERT(unit_by_id(gs, settler->id) == NULL);
+
+    Unit *settler2 = unit_create(gs, UNIT_TYPE_SETTLER, UNIT_OWNER_PLAYER, tx, ty);
+    ASSERT(game_settler_colonise(gs, settler2) == 0);
+
+    int wx = 0;
+    int wy = 0;
+    gs->map.tiles[wy][wx].terrain = TERRAIN_WATER;
+    gs->map.tiles[wy][wx].city_id = -1;
+    gs->map.tiles[wy][wx].camp_id = -1;
+    Unit *settler3 = unit_create(gs, UNIT_TYPE_SETTLER, UNIT_OWNER_PLAYER, wx, wy);
+    ASSERT(game_settler_colonise(gs, settler3) == 0);
+
+    free_game(gs);
+}
+
 int main(void) {
     printf("Tests :\n");
 
     printf("chebyshev... "); test_chebyshev(); printf("ok\n");
     printf("seed determinism... "); test_seed_determinism(); printf("ok\n");
+    printf("colonise... "); test_colonise(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
