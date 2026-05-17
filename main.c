@@ -71,7 +71,15 @@ int main(int argc, char **argv) {
         }
         sdl_run(gs);
     } else {
-        gs = gen_game(width, height, turns, n_barbs, seed);
+        while (!gs) {
+            char path[256] = "";
+            int choice = cli_choose_start(path);
+            if (choice == -1) return 0;
+            if (choice == 0)
+                gs = gen_game(width, height, turns, n_barbs, seed);
+            else
+                gs = game_load(path);
+        }
         game_run(gs);
     }
 

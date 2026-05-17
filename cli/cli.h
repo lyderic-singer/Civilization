@@ -5,6 +5,7 @@
 #include "../core/turn.h"
 
 void game_run(GameState *gs);
+int cli_choose_start(char *out_path);
 
 void print_map(GameState *gs);
 void print_status(GameState *gs);

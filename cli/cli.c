@@ -2,6 +2,56 @@
 #include "../core/save.h"
 #include <unistd.h>
 
+int cli_choose_start(char *out_path) {
+    char saves[32][256];
+    ScoreEntry scores[64];
+
+    while (1) {
+        printf("\n=== Early Civilization ===\n");
+        printf("1. Nouvelle partie\n");
+        printf("2. Charger une sauvegarde\n");
+        printf("3. Scores\n");
+        printf("4. Quitter\n");
+        printf("> ");
+        fflush(stdout);
+
+        char line[16];
+        if (!fgets(line, sizeof(line), stdin)) return -1;
+        int choice = atoi(line);
+
+        if (choice == 1) return 0;
+        if (choice == 4) return -1;
+
+        if (choice == 2) {
+            int n = saves_list(saves, 32);
+            if (n == 0) { printf("Aucune sauvegarde trouvee.\n"); continue; }
+            printf("\n--- Sauvegardes ---\n");
+            for (int i = 0; i < n; i++) {
+                char display[128];
+                format_save_name(saves[i] + strlen(SAVES_DIR) + 1, display, sizeof(display));
+                printf("  %d. %s\n", i + 1, display);
+            }
+            printf("  0. Retour\n> ");
+            fflush(stdout);
+            if (!fgets(line, sizeof(line), stdin)) continue;
+            int idx = atoi(line) - 1;
+            if (idx < 0 || idx >= n) continue;
+            snprintf(out_path, 256, "%s", saves[idx]);
+            return 1;
+        }
+
+        if (choice == 3) {
+            int n = scores_read(scores, 64);
+            printf("\n--- Tableau des scores ---\n");
+            if (n == 0) { printf("Aucune partie terminee.\n"); continue; }
+            printf("  %-12s %-18s %-8s Tour\n", "Date", "Resultat", "Score");
+            for (int i = 0; i < n; i++)
+                printf("  %-12s %-18s %-8d %d\n",
+                       scores[i].date, scores[i].result, scores[i].score, scores[i].tour);
+        }
+    }
+}
+
 void cmd_move(GameState *gs, char *args) {
     char *s_id = strtok(args, " "), *s_dx = strtok(NULL, " "), *s_dy = strtok(NULL, " ");
     if (!s_id || !s_dx || !s_dy) { printf("Usage: move <id> <dx> <dy>\n"); return; }
