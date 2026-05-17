@@ -104,6 +104,27 @@ static void test_city_famine(void) {
     free_game(gs);
 }
 
+static void test_production(void) {
+    Seed s = gen_seed("4986557552134986");
+    GameState *gs = gen_game(20, 20, 100, 0, s);
+    City *c = gs->cities;
+
+    c->yield_prod = 10;
+    city_set_project(c, PROJECT_BUILDING, BUILDING_GRANARY);
+    int cost = city_project_cost(gs, c);
+
+    cities_produce(gs);
+    ASSERT(c->prod_stock == 10);
+
+    c->prod_stock = cost - 1;
+    cities_produce(gs);
+    ASSERT(c->buildings & BUILDING_GRANARY);
+    ASSERT(c->prod_stock == 0);
+    ASSERT(c->project_type == PROJECT_NONE);
+
+    free_game(gs);
+}
+
 int main(void) {
     printf("Tests :\n");
 
@@ -112,6 +133,7 @@ int main(void) {
     printf("colonise... "); test_colonise(); printf("ok\n");
     printf("city growth... "); test_city_growth(); printf("ok\n");
     printf("city famine... "); test_city_famine(); printf("ok\n");
+    printf("production... "); test_production(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
