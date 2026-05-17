@@ -8,7 +8,9 @@
 #include "tech.h"
 #include <stdio.h>
 #include <time.h>
+#include <string.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 #define CHECK(n, expr) if ((expr) != (n)) goto fail
 
@@ -102,6 +104,49 @@ void game_save(GameState *gs) {
 
     fclose(f);
     printf("Sauvegarde: %s\n", final_path);
+}
+
+int saves_list(char paths[][256], int max) {
+    int n = 0;
+    DIR *d = opendir(SAVES_DIR);
+    if (!d) return 0;
+    struct dirent *e;
+    while ((e = readdir(d)) && n < max) {
+        int len = strlen(e->d_name);
+        if (len > 4 && strcmp(e->d_name + len - 4, ".txt") == 0) {
+            snprintf(paths[n], 256, "%s/%s", SAVES_DIR, e->d_name);
+            n++;
+        }
+    }
+    closedir(d);
+    return n;
+}
+
+int scores_read(ScoreEntry *entries, int max) {
+    FILE *f = fopen(SCORES_FILE, "r");
+    if (!f) return 0;
+    int n = 0;
+    char line[128];
+    while (n < max && fgets(line, sizeof(line), f)) {
+        line[strcspn(line, "\n")] = '\0';
+        if (sscanf(line, "%s %s %d tour:%d",
+                   entries[n].date, entries[n].result,
+                   &entries[n].score, &entries[n].tour) == 4)
+            n++;
+    }
+    fclose(f);
+    return n;
+}
+
+void format_save_name(const char *filename, char *out, int outlen) {
+    int tour, year, month, day, hour, minute;
+    if (sscanf(filename, "save_tour%d_%4d%2d%2d_%2d%2d.txt",
+               &tour, &year, &month, &day, &hour, &minute) == 6) {
+        snprintf(out, outlen, "Tour %d  |  %02d/%02d/%04d  %02dh%02d",
+                 tour, day, month, year, hour, minute);
+    } else {
+        snprintf(out, outlen, "%s", filename);
+    }
 }
 
 GameState *game_load(const char *path) {

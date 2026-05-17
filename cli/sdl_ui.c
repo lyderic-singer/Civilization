@@ -4,7 +4,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <stdint.h>
-#include <dirent.h>
 #include <string.h>
 
 typedef struct { uint8_t r, g, b; } Color;
@@ -448,32 +447,9 @@ static void draw_entities(SDL_Renderer *r, GameState *gs, Camera cam) {
     }
 }
 
-static void format_save_name(const char *filename, char *out, int outlen) {
-    int tour, year, month, day, hour, minute;
-    if (sscanf(filename, "save_tour%d_%4d%2d%2d_%2d%2d.txt",
-               &tour, &year, &month, &day, &hour, &minute) == 6) {
-        snprintf(out, outlen, "Tour %d  |  %02d/%02d/%04d  %02dh%02d",
-                 tour, day, month, year, hour, minute);
-    } else {
-        snprintf(out, outlen, "%s", filename);
-    }
-}
-
 int sdl_choose_start(char *out_path) {
     char saves[32][256];
-    int n_saves = 0;
-    DIR *d = opendir(SAVES_DIR);
-    if (d) {
-        struct dirent *e;
-        while ((e = readdir(d)) && n_saves < 32) {
-            int len = strlen(e->d_name);
-            if (len > 4 && strcmp(e->d_name + len - 4, ".txt") == 0) {
-                snprintf(saves[n_saves], 256, "%s/%s", SAVES_DIR, e->d_name);
-                n_saves++;
-            }
-        }
-        closedir(d);
-    }
+    int n_saves = saves_list(saves, 32);
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -520,16 +496,8 @@ int sdl_choose_start(char *out_path) {
         return -1;
     }
 
-    char score_lines[64][128];
-    int n_scores = 0;
-    FILE *sf = fopen(SCORES_FILE, "r");
-    if (sf) {
-        while (n_scores < 64 && fgets(score_lines[n_scores], 128, sf)) {
-            score_lines[n_scores][strcspn(score_lines[n_scores], "\n")] = '\0';
-            n_scores++;
-        }
-        fclose(sf);
-    }
+    ScoreEntry scores[64];
+    int n_scores = scores_read(scores, 64);
 
     static const char *options[] = { "Nouvelle partie", "Charger une sauvegarde", "Scores" };
     typedef enum { SCREEN_MENU, SCREEN_SAVES, SCREEN_SCORES } Screen;
@@ -623,19 +591,14 @@ int sdl_choose_start(char *out_path) {
                 draw_text(renderer, font, "Score", c2, y0, COL_GRAY);
                 draw_text(renderer, font, "Tour", c3, y0, COL_GRAY);
                 for (int i = 0; i < n_scores; i++) {
-                    char date[32], result[32], seed[64];
-                    int score, tour;
-                    if (sscanf(score_lines[i], "%s %s %d tour:%d seed:%s",
-                               date, result, &score, &tour, seed) == 5) {
-                        char sbuf[16], tbuf[16];
-                        snprintf(sbuf, sizeof(sbuf), "%d", score);
-                        snprintf(tbuf, sizeof(tbuf), "%d", tour);
-                        int y = y0 + (i + 1) * LINE_H;
-                        draw_text(renderer, font, date, c0, y, COL_WHITE);
-                        draw_text(renderer, font, result, c1, y, COL_YELLOW);
-                        draw_text(renderer, font, sbuf, c2, y, COL_CYAN);
-                        draw_text(renderer, font, tbuf, c3, y, COL_WHITE);
-                    }
+                    char sbuf[16], tbuf[16];
+                    snprintf(sbuf, sizeof(sbuf), "%d", scores[i].score);
+                    snprintf(tbuf, sizeof(tbuf), "%d", scores[i].tour);
+                    int y = y0 + (i + 1) * LINE_H;
+                    draw_text(renderer, font, scores[i].date,   c0, y, COL_WHITE);
+                    draw_text(renderer, font, scores[i].result, c1, y, COL_YELLOW);
+                    draw_text(renderer, font, sbuf,             c2, y, COL_CYAN);
+                    draw_text(renderer, font, tbuf,             c3, y, COL_WHITE);
                 }
             }
             const char *hint = "[Echap=retour]";
