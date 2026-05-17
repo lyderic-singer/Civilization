@@ -130,35 +130,40 @@ int cmd_dispatch(GameState *gs, char *cmd, char *args) {
     if (strcmp(cmd, "col") == 0) { cmd_col(gs, args); return 1; }
     if (strcmp(cmd, "proj") == 0) { cmd_proj(gs, args); return 1; }
     if (strcmp(cmd, "research") == 0) { cmd_research(gs, args); return 1; }
+    if (strcmp(cmd, "save") == 0) {
+        game_save(gs);
+        printf("Partie sauvegardee.\n");
+        return 1;
+    }
     if (strcmp(cmd, "quit") == 0) {
         printf("Au revoir.\n");
-        gs->result = RESULT_LOSS_TURNS;
-        return 0;
+        return -1;
     }
     printf("Commande inconnue. Tapez 'help'.\n");
     return 1;
 }
 
-void game_phase_action(GameState *gs) {
+int game_phase_action(GameState *gs) {
     units_reset_pm(gs, UNIT_OWNER_PLAYER);
     print_map(gs); print_status(gs); print_help();
     char line[256];
     while (1) {
         printf("> "); fflush(stdout);
-        if (!fgets(line, sizeof line, stdin)) break;
+        if (!fgets(line, sizeof line, stdin)) return -1;
         size_t len = strlen(line);
         if (len > 0 && line[len-1] == '\n') line[len-1] = '\0';
         char *cmd = strtok(line, " ");
         if (!cmd) continue;
         char *args = strtok(NULL, "");
-        if (!cmd_dispatch(gs, cmd, args)) break;
+        int r = cmd_dispatch(gs, cmd, args);
+        if (r <= 0) return r;
     }
 }
 
 void game_run(GameState *gs) {
     cities_compute_yields(gs);
     while (gs->result == RESULT_ONGOING) {
-        game_phase_action(gs);
+        if (game_phase_action(gs) == -1) return;
         if (gs->result != RESULT_ONGOING) break;
         game_phase_production(gs);
         cities_grow(gs);
@@ -342,6 +347,7 @@ void print_help(void) {
     printf("  col <id>             Coloniser (settler uniquement)\n");
     printf("  proj <city_id> <type> <id>   Definir projet (type: u=unite b=batiment)\n");
     printf("  research <tech_id>   Lancer recherche\n");
+    printf("  save                 Sauvegarder la partie\n");
     printf("  end                  Passer au tour suivant\n");
     printf("  help                 Afficher cette aide\n");
     printf("  quit                 Quitter\n\n");
