@@ -245,8 +245,23 @@ void print_map(GameState *gs) {
         }
         printf("\n");
     }
-    printf("\nLegende: P=Plaine F=Foret M=Montagne ~=Eau D=Desert T=Toundra\n");
-    printf("         C=Ville S=Colon W=Guerrier b=Barbare X=Camp barbare\n\n");
+    if (color) {
+        printf("\nLegende terrain:\n  ");
+        const char *tnames[] = { "Plaine", "Foret", "Montagne", "Eau", "Desert", "Toundra" };
+        for (int i = 0; i < TERRAIN_COUNT; i++)
+            printf("\033[48;2;%d;%d;%dm  \033[0m=%s  ",
+                   TERRAIN_BG[i][0], TERRAIN_BG[i][1], TERRAIN_BG[i][2],
+                   tnames[i]);
+        printf("\nLegende entites:\n  ");
+        printf("\033[38;2;255;255;255mC\033[0m=Ville  ");
+        printf("\033[38;2;240;220;50mS\033[0m=Colon  ");
+        printf("\033[38;2;50;150;240mW\033[0m=Guerrier  ");
+        printf("\033[38;2;200;40;40mb\033[0m=Barbare  ");
+        printf("\033[38;2;220;120;30mX\033[0m=Camp barbare\n\n");
+    } else {
+        printf("\nLegende: P=Plaine F=Foret M=Montagne ~=Eau D=Desert T=Toundra\n");
+        printf("         C=Ville S=Colon W=Guerrier b=Barbare X=Camp barbare\n\n");
+    }
 }
 
 void print_status(GameState *gs) {
