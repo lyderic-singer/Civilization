@@ -104,18 +104,17 @@ void print_tech(GameState *gs) {
     printf("=== Technologies ===\n");
     for (int i = 0; i < TECH_COUNT; i++) {
         const TechDef *d = tech_def(i);
+        char buf[32];
         const char *status;
         if (gs->tech.acquired[i]) status = "[OK]";
         else if (gs->tech.researching == i) {
-            char buf[32];
             snprintf(buf, sizeof buf, "[%d/%d]", gs->tech.science_stored, d->cost);
             status = buf;
         }
         else if (tech_available(&gs->tech, i)) status = "[dispo]";
-        else {
-            status = "[verr.]";
-            printf("  %d. %-15s %s  (cout:%d)\n", i, d->name, status, d->cost);
-    }}
+        else status = "[verr.]";
+        printf("  %d. %-15s %s  (cout:%d)\n", i, d->name, status, d->cost);
+    }
 }
 
 void print_help(void) {
