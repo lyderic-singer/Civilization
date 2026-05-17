@@ -129,7 +129,7 @@ int scores_read(ScoreEntry *entries, int max) {
     char line[128];
     while (n < max && fgets(line, sizeof(line), f)) {
         line[strcspn(line, "\n")] = '\0';
-        if (sscanf(line, "%s %s %d tour:%d",
+        if (sscanf(line, "%31s %31s %d tour:%d",
                    entries[n].date, entries[n].result,
                    &entries[n].score, &entries[n].tour) == 4)
             n++;
@@ -168,7 +168,7 @@ GameState *game_load(const char *path) {
     CHECK(1, fscanf(f, "next_unit_id %d\n", &gs->next_unit_id));
     CHECK(1, fscanf(f, "next_city_id %d\n", &gs->next_city_id));
     CHECK(1, fscanf(f, "next_camp_id %d\n", &gs->next_camp_id));
-    CHECK(1, fscanf(f, "seed_hex %s\n", seed_hex));
+    CHECK(1, fscanf(f, "seed_hex %16s\n", seed_hex));
     CHECK(1, fscanf(f, "result %d\n", (int *)&gs->result));
     gs->seed = gen_seed(seed_hex);
 
