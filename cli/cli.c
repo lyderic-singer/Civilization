@@ -1,4 +1,5 @@
 #include "cli.h"
+#include "../core/save.h"
 
 void cmd_move(GameState *gs, char *args) {
     char *s_id = strtok(args, " "), *s_dx = strtok(NULL, " "), *s_dy = strtok(NULL, " ");
@@ -119,6 +120,7 @@ void game_run(GameState *gs) {
             cities_compute_yields(gs);
     }}
     game_compute_score(gs);
+    scores_append(gs);
     print_result(gs);
 }
 
