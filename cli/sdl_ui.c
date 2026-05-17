@@ -448,6 +448,17 @@ static void draw_entities(SDL_Renderer *r, GameState *gs, Camera cam) {
     }
 }
 
+static void format_save_name(const char *filename, char *out, int outlen) {
+    int tour, year, month, day, hour, minute;
+    if (sscanf(filename, "save_tour%d_%4d%2d%2d_%2d%2d.txt",
+               &tour, &year, &month, &day, &hour, &minute) == 6) {
+        snprintf(out, outlen, "Tour %d  |  %02d/%02d/%04d  %02dh%02d",
+                 tour, day, month, year, hour, minute);
+    } else {
+        snprintf(out, outlen, "%s", filename);
+    }
+}
+
 int sdl_choose_start(char *out_path) {
     char saves[32][256];
     int n_saves = 0;
@@ -573,7 +584,9 @@ int sdl_choose_start(char *out_path) {
                 for (int i = 0; i < n_saves; i++) {
                     SDL_Color col = (i == cursor) ? COL_WHITE : COL_GRAY;
                     const char *name = saves[i] + strlen(SAVES_DIR) + 1;
-                    draw_text(renderer, font, name, cx - text_width(font, name) / 2,
+                    char display[128];
+                    format_save_name(name, display, sizeof(display));
+                    draw_text(renderer, font, display, cx - text_width(font, display) / 2,
                               cy - LINE_H + i * LINE_H * 2, col);
                 }
             }
