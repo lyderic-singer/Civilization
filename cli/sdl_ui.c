@@ -446,6 +446,99 @@ static void draw_entities(SDL_Renderer *r, GameState *gs, Camera cam) {
     }
 }
 
+int sdl_choose_start(void) {
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "SDL_Init: %s\n", SDL_GetError());
+        return -1;
+    }
+    if (TTF_Init() != 0) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "TTF_Init: %s\n", TTF_GetError());
+        SDL_Quit();
+        return -1;
+    }
+
+    SDL_Window *win = SDL_CreateWindow("Early Civilization",
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        SCREEN_W, SCREEN_H + PANEL_H, SDL_WINDOW_SHOWN);
+    if (!win) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "SDL_CreateWindow: %s\n", SDL_GetError());
+        TTF_Quit();
+        SDL_Quit();
+        return -1;
+    }
+    SDL_Renderer *renderer = SDL_CreateRenderer(win, -1,
+        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (!renderer) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "SDL_CreateRenderer: %s\n", SDL_GetError());
+        SDL_DestroyWindow(win);
+        TTF_Quit();
+        SDL_Quit();
+        return -1;
+    }
+
+    TTF_Font *font = TTF_OpenFont(FONT_PATH, FONT_SIZE);
+    if (!font) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "TTF_OpenFont: %s\n", TTF_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(win);
+        TTF_Quit();
+        SDL_Quit();
+        return -1;
+    }
+    static const char *options[] = { "Nouvelle partie", "Charger une sauvegarde" };
+    int cursor = 0;
+    int choice = -1;
+
+    while (choice == -1) {
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_QUIT) { choice = -2; break; }
+            if (e.type == SDL_KEYDOWN) {
+                switch (e.key.keysym.sym) {
+                    case SDLK_ESCAPE: choice = -2; break;
+                    case SDLK_UP: cursor = (cursor - 1 + 2) % 2; break;
+                    case SDLK_DOWN: cursor = (cursor + 1) % 2; break;
+                    case SDLK_RETURN: choice = cursor; break;
+                    default: break;
+                }
+            }
+        }
+
+        SDL_SetRenderDrawColor(renderer, COL_BLACK.r, COL_BLACK.g, COL_BLACK.b, COL_BLACK.a);
+        SDL_RenderClear(renderer);
+
+        int cx = SCREEN_W / 2;
+        int cy = (SCREEN_H + PANEL_H) / 2;
+
+        const char *title = "Early Civilization";
+        draw_text(renderer, font, title, cx - text_width(font, title) / 2, cy - LINE_H * 4, COL_WHITE);
+
+        for (int i = 0; i < 2; i++) {
+            SDL_Color col = (i == cursor) ? COL_WHITE : COL_GRAY;
+            draw_text(renderer, font, options[i], cx - text_width(font, options[i]) / 2,
+                      cy + i * LINE_H * 2, col);
+        }
+
+        const char *hint = "[Haut/Bas=naviguer]  [Entree=choisir]  [Echap=quitter]";
+        draw_text(renderer, font, hint, cx - text_width(font, hint) / 2, cy + LINE_H * 5, COL_GRAY);
+
+        SDL_RenderPresent(renderer);
+    }
+
+    TTF_CloseFont(font);
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(win);
+    TTF_Quit();
+    SDL_Quit();
+
+    return (choice >= 0) ? choice : -1;
+}
+
 void sdl_run(GameState *gs) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
