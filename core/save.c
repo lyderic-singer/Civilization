@@ -205,13 +205,13 @@ GameState *game_load(const char *path) {
     for (int i = 0; i < nc; i++) {
         City *c = calloc(1, sizeof(City));
         if (!c) goto fail;
+        c->next = gs->cities;
+        gs->cities = c;
         CHECK(13, fscanf(f, "%d %d %d %d %d %d %d %d %d %d %d %d %d\n",
                &c->id, &c->x, &c->y, &c->population,
                &c->food_stock, &c->prod_stock, &c->hp, &c->hp_max,
                &c->buildings, &c->founded_turn,
                &c->project_type, &c->project_id, &c->took_damage_this_turn));
-        c->next = gs->cities;
-        gs->cities = c;
     }
 
     int nu;
@@ -219,6 +219,8 @@ GameState *game_load(const char *path) {
     for (int i = 0; i < nu; i++) {
         Unit *u = calloc(1, sizeof(Unit));
         if (!u) goto fail;
+        u->next = gs->units;
+        gs->units = u;
         int type, owner;
         CHECK(12, fscanf(f, "%d %d %d %d %d %d %d %d %d %d %d %d\n",
                &u->id, &type, &owner,
@@ -226,8 +228,6 @@ GameState *game_load(const char *path) {
                &u->attack, &u->defense, &u->pm_max, &u->pm_left, &u->maint));
         u->type = (UnitType)type;
         u->owner = (UnitOwner)owner;
-        u->next = gs->units;
-        gs->units = u;
     }
 
     int ncamp;
@@ -235,9 +235,9 @@ GameState *game_load(const char *path) {
     for (int i = 0; i < ncamp; i++) {
         Camp *c = calloc(1, sizeof(Camp));
         if (!c) goto fail;
-        CHECK(4, fscanf(f, "%d %d %d %d\n", &c->id, &c->x, &c->y, &c->alive));
         c->next = gs->camps;
         gs->camps = c;
+        CHECK(4, fscanf(f, "%d %d %d %d\n", &c->id, &c->x, &c->y, &c->alive));
     }
 
     fclose(f);
