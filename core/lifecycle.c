@@ -129,9 +129,6 @@ GameState *gen_game(int width, int height, int turns, int n_barb_camps, Seed see
     gs->map = gen_map(width, height, seed);
     gen_first_city(gs);
     gen_camps(gs, n_barb_camps);
-    printf("\n=== Early Civilization ===\n");
-    printf("Seed: 0x%s\n", gs->seed.hex);
-    printf("Carte: %dx%d | Tours max: %d | Camps barbares: %d\n\n", width, height, turns, n_barb_camps);
     return gs;
 }
 
