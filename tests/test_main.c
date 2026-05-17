@@ -219,6 +219,24 @@ static void test_game_result(void) {
     free_game(gs);
 }
 
+static void test_combat_city(void) {
+    Seed s = gen_seed("7846153014698");
+    GameState *gs = gen_game(20, 20, 100, 0, s);
+
+    City *c = gs->cities;
+    int city_id = c->id;
+
+    Unit *attacker = unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_BARB, 5, 5);
+    attacker->attack = 999;
+    c->hp = 1;
+
+    unit_attack_city(gs, attacker, c);
+
+    ASSERT(city_by_id(gs, city_id) == NULL);
+
+    free_game(gs);
+}
+
 int main(void) {
     printf("Tests :\n");
 
@@ -232,6 +250,7 @@ int main(void) {
     printf("combat... "); test_combat(); printf("ok\n");
     printf("unit move... "); test_unit_move(); printf("ok\n");
     printf("game result... "); test_game_result(); printf("ok\n");
+    printf("combat city... "); test_combat_city(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
