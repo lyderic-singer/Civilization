@@ -90,6 +90,20 @@ static void test_city_growth(void) {
     free_game(gs);
 }
 
+static void test_city_famine(void) {
+    Seed s = gen_seed("49815327984615");
+    GameState *gs = gen_game(20, 20, 100, 0, s);
+    City *c = gs->cities;
+
+    c->population = 2;
+    c->yield_food = 0;
+    c->food_stock = 0;
+    cities_grow(gs);
+    ASSERT(c->population == 1);
+
+    free_game(gs);
+}
+
 int main(void) {
     printf("Tests :\n");
 
@@ -97,6 +111,7 @@ int main(void) {
     printf("seed determinism... "); test_seed_determinism(); printf("ok\n");
     printf("colonise... "); test_colonise(); printf("ok\n");
     printf("city growth... "); test_city_growth(); printf("ok\n");
+    printf("city famine... "); test_city_famine(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
