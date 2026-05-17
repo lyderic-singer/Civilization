@@ -131,8 +131,14 @@ int cmd_dispatch(GameState *gs, char *cmd, char *args) {
     if (strcmp(cmd, "proj") == 0) { cmd_proj(gs, args); return 1; }
     if (strcmp(cmd, "research") == 0) { cmd_research(gs, args); return 1; }
     if (strcmp(cmd, "save") == 0) {
-        game_save(gs);
-        printf("Partie sauvegardee.\n");
+        static int last_saved_turn = -1;
+        if (gs->turn != last_saved_turn) {
+            game_save(gs);
+            last_saved_turn = gs->turn;
+            printf("Partie sauvegardee.\n");
+        } else {
+            printf("Deja sauvegarde ce tour.\n");
+        }
         return 1;
     }
     if (strcmp(cmd, "quit") == 0) {
@@ -173,7 +179,6 @@ void game_run(GameState *gs) {
             gs->turn++;
             cities_compute_yields(gs);
     }}
-    game_compute_score(gs);
     scores_append(gs);
     print_result(gs);
 }
