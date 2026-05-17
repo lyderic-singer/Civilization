@@ -1,5 +1,6 @@
 #include "cli/cli.h"
 #include "cli/sdl_ui.h"
+#include "core/save.h"
 
 void print_usage(const char *prog) {
     printf("Usage: %s [options]\n", prog);
@@ -56,12 +57,23 @@ int main(int argc, char **argv) {
     if (n_barbs < 0) n_barbs = 0;
     if (!has_seed) seed = gen_random_seed();
 
-    GameState *gs = gen_game(width, height, turns, n_barbs, seed);
+    GameState *gs = NULL;
 
-    if (mode_sdl)
+    if (mode_sdl) {
+        while (!gs) {
+            char path[256] = "";
+            int choice = sdl_choose_start(path);
+            if (choice == -1) return 0;
+            if (choice == 0)
+                gs = gen_game(width, height, turns, n_barbs, seed);
+            else
+                gs = game_load(path);
+        }
         sdl_run(gs);
-    else
+    } else {
+        gs = gen_game(width, height, turns, n_barbs, seed);
         game_run(gs);
+    }
 
     free_game(gs);
     return 0;

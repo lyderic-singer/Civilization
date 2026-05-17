@@ -4,6 +4,8 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <stdint.h>
+#include <dirent.h>
+#include <string.h>
 
 typedef struct { uint8_t r, g, b; } Color;
 typedef struct { int x, y; } Camera;
@@ -446,7 +448,22 @@ static void draw_entities(SDL_Renderer *r, GameState *gs, Camera cam) {
     }
 }
 
-int sdl_choose_start(void) {
+int sdl_choose_start(char *out_path) {
+    char saves[32][256];
+    int n_saves = 0;
+    DIR *d = opendir(SAVES_DIR);
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d)) && n_saves < 32) {
+            int len = strlen(e->d_name);
+            if (len > 4 && strcmp(e->d_name + len - 4, ".txt") == 0) {
+                snprintf(saves[n_saves], 256, "%s/%s", SAVES_DIR, e->d_name);
+                n_saves++;
+            }
+        }
+        closedir(d);
+    }
+
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "SDL_Init: %s\n", SDL_GetError());
@@ -469,6 +486,7 @@ int sdl_choose_start(void) {
         SDL_Quit();
         return -1;
     }
+
     SDL_Renderer *renderer = SDL_CreateRenderer(win, -1,
         SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!renderer) {
@@ -490,7 +508,10 @@ int sdl_choose_start(void) {
         SDL_Quit();
         return -1;
     }
+
     static const char *options[] = { "Nouvelle partie", "Charger une sauvegarde" };
+    typedef enum { SCREEN_MENU, SCREEN_SAVES } Screen;
+    Screen screen = SCREEN_MENU;
     int cursor = 0;
     int choice = -1;
 
@@ -500,10 +521,27 @@ int sdl_choose_start(void) {
             if (e.type == SDL_QUIT) { choice = -2; break; }
             if (e.type == SDL_KEYDOWN) {
                 switch (e.key.keysym.sym) {
-                    case SDLK_ESCAPE: choice = -2; break;
-                    case SDLK_UP: cursor = (cursor - 1 + 2) % 2; break;
-                    case SDLK_DOWN: cursor = (cursor + 1) % 2; break;
-                    case SDLK_RETURN: choice = cursor; break;
+                    case SDLK_ESCAPE:
+                        if (screen == SCREEN_SAVES) { screen = SCREEN_MENU; cursor = 0; }
+                        else choice = -2;
+                        break;
+                    case SDLK_UP:
+                        if (screen == SCREEN_MENU) cursor = (cursor - 1 + 2) % 2;
+                        else if (n_saves > 0) cursor = (cursor - 1 + n_saves) % n_saves;
+                        break;
+                    case SDLK_DOWN:
+                        if (screen == SCREEN_MENU) cursor = (cursor + 1) % 2;
+                        else if (n_saves > 0) cursor = (cursor + 1) % n_saves;
+                        break;
+                    case SDLK_RETURN:
+                        if (screen == SCREEN_MENU) {
+                            if (cursor == 0) choice = 0;
+                            else { screen = SCREEN_SAVES; cursor = 0; }
+                        } else if (n_saves > 0) {
+                            snprintf(out_path, 256, "%s", saves[cursor]);
+                            choice = 1;
+                        }
+                        break;
                     default: break;
                 }
             }
@@ -515,17 +553,33 @@ int sdl_choose_start(void) {
         int cx = SCREEN_W / 2;
         int cy = (SCREEN_H + PANEL_H) / 2;
 
-        const char *title = "Early Civilization";
-        draw_text(renderer, font, title, cx - text_width(font, title) / 2, cy - LINE_H * 4, COL_WHITE);
-
-        for (int i = 0; i < 2; i++) {
-            SDL_Color col = (i == cursor) ? COL_WHITE : COL_GRAY;
-            draw_text(renderer, font, options[i], cx - text_width(font, options[i]) / 2,
-                      cy + i * LINE_H * 2, col);
+        if (screen == SCREEN_MENU) {
+            const char *title = "Early Civilization";
+            draw_text(renderer, font, title, cx - text_width(font, title) / 2, cy - LINE_H * 4, COL_WHITE);
+            for (int i = 0; i < 2; i++) {
+                SDL_Color col = (i == cursor) ? COL_WHITE : COL_GRAY;
+                draw_text(renderer, font, options[i], cx - text_width(font, options[i]) / 2,
+                          cy + i * LINE_H * 2, col);
+            }
+            const char *hint = "[Haut/Bas=naviguer]  [Entree=choisir]  [Echap=quitter]";
+            draw_text(renderer, font, hint, cx - text_width(font, hint) / 2, cy + LINE_H * 5, COL_GRAY);
+        } else {
+            const char *title = "Choisir une sauvegarde";
+            draw_text(renderer, font, title, cx - text_width(font, title) / 2, cy - LINE_H * 4, COL_WHITE);
+            if (n_saves == 0) {
+                const char *msg = "Aucune sauvegarde trouvee";
+                draw_text(renderer, font, msg, cx - text_width(font, msg) / 2, cy, COL_GRAY);
+            } else {
+                for (int i = 0; i < n_saves; i++) {
+                    SDL_Color col = (i == cursor) ? COL_WHITE : COL_GRAY;
+                    const char *name = saves[i] + strlen(SAVES_DIR) + 1;
+                    draw_text(renderer, font, name, cx - text_width(font, name) / 2,
+                              cy - LINE_H + i * LINE_H * 2, col);
+                }
+            }
+            const char *hint = "[Haut/Bas=naviguer]  [Entree=choisir]  [Echap=retour]";
+            draw_text(renderer, font, hint, cx - text_width(font, hint) / 2, cy + LINE_H * 5, COL_GRAY);
         }
-
-        const char *hint = "[Haut/Bas=naviguer]  [Entree=choisir]  [Echap=quitter]";
-        draw_text(renderer, font, hint, cx - text_width(font, hint) / 2, cy + LINE_H * 5, COL_GRAY);
 
         SDL_RenderPresent(renderer);
     }

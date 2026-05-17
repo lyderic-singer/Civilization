@@ -22,6 +22,6 @@
 
 
 void sdl_run(GameState *gs);
-int sdl_choose_start(void);
+int sdl_choose_start(char *out_path);
 
 #endif
