@@ -156,12 +156,13 @@ static void test_combat(void) {
     attacker->hp = attacker->hp_max;
     defender->hp = 1;
 
+    int def_defense = defender->defense;
     unit_attack_unit(gs, attacker, defender);
 
     ASSERT(unit_by_id(gs, def_id) == NULL);
     ASSERT(unit_by_id(gs, atk_id) != NULL);
 
-    int dmg = attacker->attack - defender->defense;
+    int dmg = attacker->attack - def_defense;
     if (dmg < 1) dmg = 1;
     Unit *a2 = unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, 7, 5);
     Unit *d2 = unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_BARB, 8, 5);
