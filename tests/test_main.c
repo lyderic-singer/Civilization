@@ -173,6 +173,28 @@ static void test_combat(void) {
     free_game(gs);
 }
 
+static void test_unit_move(void) {
+    Seed s = gen_seed("143841235618");
+    GameState *gs = gen_game(20, 20, 100, 0, s);
+
+    Unit *u = unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, 5, 5);
+    gs->map.tiles[5][6].terrain = TERRAIN_PLAIN;
+    gs->map.tiles[5][7].terrain = TERRAIN_WATER;
+
+    int pm_before = u->pm_left;
+    ASSERT(unit_move(gs, u, 6, 5) == 1);
+    ASSERT(u->x == 6 && u->y == 5);
+    ASSERT(u->pm_left == pm_before - MOVE_COSTS[TERRAIN_PLAIN]);
+
+    ASSERT(unit_move(gs, u, 7, 5) == 0);
+    ASSERT(u->x == 6 && u->y == 5);
+
+    u->pm_left = 0;
+    ASSERT(unit_move(gs, u, 6, 4) == 0);
+
+    free_game(gs);
+}
+
 int main(void) {
     printf("Tests :\n");
 
@@ -184,6 +206,7 @@ int main(void) {
     printf("production... "); test_production(); printf("ok\n");
     printf("tech... "); test_tech(); printf("ok\n");
     printf("combat... "); test_combat(); printf("ok\n");
+    printf("unit move... "); test_unit_move(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
