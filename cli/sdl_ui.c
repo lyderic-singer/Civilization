@@ -520,8 +520,19 @@ int sdl_choose_start(char *out_path) {
         return -1;
     }
 
-    static const char *options[] = { "Nouvelle partie", "Charger une sauvegarde" };
-    typedef enum { SCREEN_MENU, SCREEN_SAVES } Screen;
+    char score_lines[64][128];
+    int n_scores = 0;
+    FILE *sf = fopen(SCORES_FILE, "r");
+    if (sf) {
+        while (n_scores < 64 && fgets(score_lines[n_scores], 128, sf)) {
+            score_lines[n_scores][strcspn(score_lines[n_scores], "\n")] = '\0';
+            n_scores++;
+        }
+        fclose(sf);
+    }
+
+    static const char *options[] = { "Nouvelle partie", "Charger une sauvegarde", "Scores" };
+    typedef enum { SCREEN_MENU, SCREEN_SAVES, SCREEN_SCORES } Screen;
     Screen screen = SCREEN_MENU;
     int cursor = 0;
     int choice = -1;
@@ -533,22 +544,23 @@ int sdl_choose_start(char *out_path) {
             if (e.type == SDL_KEYDOWN) {
                 switch (e.key.keysym.sym) {
                     case SDLK_ESCAPE:
-                        if (screen == SCREEN_SAVES) { screen = SCREEN_MENU; cursor = 0; }
+                        if (screen != SCREEN_MENU) { screen = SCREEN_MENU; cursor = 0; }
                         else choice = -2;
                         break;
                     case SDLK_UP:
-                        if (screen == SCREEN_MENU) cursor = (cursor - 1 + 2) % 2;
-                        else if (n_saves > 0) cursor = (cursor - 1 + n_saves) % n_saves;
+                        if (screen == SCREEN_MENU) cursor = (cursor - 1 + 3) % 3;
+                        else if (screen == SCREEN_SAVES && n_saves > 0) cursor = (cursor - 1 + n_saves) % n_saves;
                         break;
                     case SDLK_DOWN:
-                        if (screen == SCREEN_MENU) cursor = (cursor + 1) % 2;
-                        else if (n_saves > 0) cursor = (cursor + 1) % n_saves;
+                        if (screen == SCREEN_MENU) cursor = (cursor + 1) % 3;
+                        else if (screen == SCREEN_SAVES && n_saves > 0) cursor = (cursor + 1) % n_saves;
                         break;
                     case SDLK_RETURN:
                         if (screen == SCREEN_MENU) {
                             if (cursor == 0) choice = 0;
-                            else { screen = SCREEN_SAVES; cursor = 0; }
-                        } else if (n_saves > 0) {
+                            else if (cursor == 1) { screen = SCREEN_SAVES; cursor = 0; }
+                            else { screen = SCREEN_SCORES; cursor = 0; }
+                        } else if (screen == SCREEN_SAVES && n_saves > 0) {
                             snprintf(out_path, 256, "%s", saves[cursor]);
                             choice = 1;
                         }
@@ -567,14 +579,14 @@ int sdl_choose_start(char *out_path) {
         if (screen == SCREEN_MENU) {
             const char *title = "Early Civilization";
             draw_text(renderer, font, title, cx - text_width(font, title) / 2, cy - LINE_H * 4, COL_WHITE);
-            for (int i = 0; i < 2; i++) {
+            for (int i = 0; i < 3; i++) {
                 SDL_Color col = (i == cursor) ? COL_WHITE : COL_GRAY;
                 draw_text(renderer, font, options[i], cx - text_width(font, options[i]) / 2,
                           cy + i * LINE_H * 2, col);
             }
             const char *hint = "[Haut/Bas=naviguer]  [Entree=choisir]  [Echap=quitter]";
             draw_text(renderer, font, hint, cx - text_width(font, hint) / 2, cy + LINE_H * 5, COL_GRAY);
-        } else {
+        } else if (screen == SCREEN_SAVES) {
             const char *title = "Choisir une sauvegarde";
             draw_text(renderer, font, title, cx - text_width(font, title) / 2, cy - LINE_H * 4, COL_WHITE);
             if (n_saves == 0) {
@@ -591,6 +603,42 @@ int sdl_choose_start(char *out_path) {
                 }
             }
             const char *hint = "[Haut/Bas=naviguer]  [Entree=choisir]  [Echap=retour]";
+            draw_text(renderer, font, hint, cx - text_width(font, hint) / 2, cy + LINE_H * 5, COL_GRAY);
+        } else {
+            const char *title = "Tableau des scores";
+            draw_text(renderer, font, title, cx - text_width(font, title) / 2, cy - LINE_H * 4, COL_WHITE);
+            if (n_scores == 0) {
+                const char *msg = "Aucune partie terminee";
+                draw_text(renderer, font, msg, cx - text_width(font, msg) / 2, cy, COL_GRAY);
+            } else {
+                int pad = SCREEN_W / 12;
+                int col_w = SCREEN_W / 4;
+                int c0 = pad;
+                int c1 = pad + col_w;
+                int c2 = pad + col_w * 2;
+                int c3 = pad + col_w * 3;
+                int y0 = cy - LINE_H * 3;
+                draw_text(renderer, font, "Date", c0, y0, COL_GRAY);
+                draw_text(renderer, font, "Resultat", c1, y0, COL_GRAY);
+                draw_text(renderer, font, "Score", c2, y0, COL_GRAY);
+                draw_text(renderer, font, "Tour", c3, y0, COL_GRAY);
+                for (int i = 0; i < n_scores; i++) {
+                    char date[32], result[32], seed[64];
+                    int score, tour;
+                    if (sscanf(score_lines[i], "%s %s %d tour:%d seed:%s",
+                               date, result, &score, &tour, seed) == 5) {
+                        char sbuf[16], tbuf[16];
+                        snprintf(sbuf, sizeof(sbuf), "%d", score);
+                        snprintf(tbuf, sizeof(tbuf), "%d", tour);
+                        int y = y0 + (i + 1) * LINE_H;
+                        draw_text(renderer, font, date, c0, y, COL_WHITE);
+                        draw_text(renderer, font, result, c1, y, COL_YELLOW);
+                        draw_text(renderer, font, sbuf, c2, y, COL_CYAN);
+                        draw_text(renderer, font, tbuf, c3, y, COL_WHITE);
+                    }
+                }
+            }
+            const char *hint = "[Echap=retour]";
             draw_text(renderer, font, hint, cx - text_width(font, hint) / 2, cy + LINE_H * 5, COL_GRAY);
         }
 
