@@ -81,10 +81,8 @@ int cmd_dispatch(GameState *gs, char *cmd, char *args) {
     if (strcmp(cmd, "research") == 0) { cmd_research(gs, args); return 1; }
     if (strcmp(cmd, "quit") == 0) {
         printf("Au revoir.\n");
-        game_compute_score(gs);
-        print_result(gs);
-        free_game(gs);
-        exit(0);
+        gs->result = RESULT_LOSS_TURNS;
+        return 0;
     }
     printf("Commande inconnue. Tapez 'help'.\n");
     return 1;
