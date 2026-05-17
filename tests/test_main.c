@@ -195,6 +195,30 @@ static void test_unit_move(void) {
     free_game(gs);
 }
 
+static void test_game_result(void) {
+    Seed s = gen_seed("41987134195312");
+    GameState *gs = gen_game(20, 20, 10, 0, s);
+
+    ASSERT(game_check_result(gs) == RESULT_ONGOING);
+
+    City *c = gs->cities;
+    city_raze(gs, c->id);
+    ASSERT(game_check_result(gs) == RESULT_LOSS_NOCITY);
+
+    free_game(gs);
+    gs = gen_game(20, 20, 1, 0, s);
+    gs->turn = 2;
+    ASSERT(game_check_result(gs) == RESULT_LOSS_TURNS);
+
+    free_game(gs);
+    gs = gen_game(20, 20, 100, 0, s);
+    for (int i = 0; i < TECH_COUNT; i++)
+        gs->tech.acquired[i] = 1;
+    ASSERT(game_check_result(gs) == RESULT_WIN_SCI);
+
+    free_game(gs);
+}
+
 int main(void) {
     printf("Tests :\n");
 
@@ -207,6 +231,7 @@ int main(void) {
     printf("tech... "); test_tech(); printf("ok\n");
     printf("combat... "); test_combat(); printf("ok\n");
     printf("unit move... "); test_unit_move(); printf("ok\n");
+    printf("game result... "); test_game_result(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
