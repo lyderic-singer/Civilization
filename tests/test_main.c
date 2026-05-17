@@ -69,12 +69,34 @@ static void test_colonise(void) {
     free_game(gs);
 }
 
+static void test_city_growth(void) {
+    Seed s = gen_seed("4651312165412384796");
+    GameState *gs = gen_game(20, 20, 100, 0, s);
+    City *c = gs->cities;
+
+    c->population = 1;
+    c->yield_food = 2;
+
+    int pop_before = c->population;
+    c->food_stock = city_growth_threshold(c) - 1;
+    cities_grow(gs);
+    ASSERT(c->population == pop_before);
+
+    c->food_stock = city_growth_threshold(c);
+    cities_grow(gs);
+    ASSERT(c->population == pop_before + 1);
+    ASSERT(c->food_stock == 0);
+
+    free_game(gs);
+}
+
 int main(void) {
     printf("Tests :\n");
 
     printf("chebyshev... "); test_chebyshev(); printf("ok\n");
     printf("seed determinism... "); test_seed_determinism(); printf("ok\n");
     printf("colonise... "); test_colonise(); printf("ok\n");
+    printf("city growth... "); test_city_growth(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
