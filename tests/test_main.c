@@ -143,6 +143,36 @@ static void test_tech(void) {
     free_game(gs);
 }
 
+static void test_combat(void) {
+    Seed s = gen_seed("497561231953416518");
+    GameState *gs = gen_game(20, 20, 100, 0, s);
+
+    Unit *attacker = unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, 5, 5);
+    Unit *defender = unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_BARB, 6, 5);
+
+    int atk_id = attacker->id;
+    int def_id = defender->id;
+
+    attacker->hp = attacker->hp_max;
+    defender->hp = 1;
+
+    unit_attack_unit(gs, attacker, defender);
+
+    ASSERT(unit_by_id(gs, def_id) == NULL);
+    ASSERT(unit_by_id(gs, atk_id) != NULL);
+
+    int dmg = attacker->attack - defender->defense;
+    if (dmg < 1) dmg = 1;
+    Unit *a2 = unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, 7, 5);
+    Unit *d2 = unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_BARB, 8, 5);
+    a2->hp = a2->hp_max;
+    d2->hp = d2->hp_max;
+    unit_attack_unit(gs, a2, d2);
+    ASSERT(d2->hp == d2->hp_max - dmg);
+
+    free_game(gs);
+}
+
 int main(void) {
     printf("Tests :\n");
 
@@ -153,6 +183,7 @@ int main(void) {
     printf("city famine... "); test_city_famine(); printf("ok\n");
     printf("production... "); test_production(); printf("ok\n");
     printf("tech... "); test_tech(); printf("ok\n");
+    printf("combat... "); test_combat(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
