@@ -97,7 +97,8 @@ int unit_move(GameState *gs, Unit *u, int nx, int ny) {
     if (enemy) {
         if (enemy->owner == u->owner) return 0; /* friendly blocking */
         int killed = unit_attack_unit(gs, u, enemy);
-        if (!killed) return 0; /* enemy was killed, fall through to move */
+        if (!killed) return 0;
+        if (!unit_by_id(gs, u->id)) return 0;
     }
     if (u->owner == UNIT_OWNER_PLAYER) {
         int camp_id = gs->map.tiles[ny][nx].camp_id;
