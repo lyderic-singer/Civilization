@@ -237,6 +237,38 @@ static void test_combat_city(void) {
     free_game(gs);
 }
 
+static void test_barbarians(void) {
+    Seed s = gen_seed("6451164578964312");
+    GameState *gs = gen_game(20, 20, 100, 1, s);
+
+    int barbs_before = gs->barb_unit_count;
+    Camp *camp = gs->camps;
+    gs->map.tiles[camp->y][camp->x].terrain = TERRAIN_PLAIN;
+
+    for (Unit *u = gs->units; u; u = u->next) {
+        if (u->x == camp->x && u->y == camp->y) {
+            u->x = -1;
+            u->y = -1;
+        }
+    }
+
+    barbarians_turn(gs);
+    ASSERT(gs->barb_unit_count == barbs_before + 1);
+
+    Unit *player = unit_at(gs, gs->cities->x, gs->cities->y, UNIT_OWNER_PLAYER);
+    if (!player)
+        player = unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, gs->cities->x, gs->cities->y);
+
+    Unit *barb = unit_create(gs, UNIT_TYPE_BARB, UNIT_OWNER_BARB, gs->cities->x + 1, gs->cities->y);
+    int hp_before = player->hp;
+    gs->barb_unit_count++;
+
+    barbarians_turn(gs);
+    ASSERT(player->hp < hp_before || unit_by_id(gs, player->id) == NULL);
+
+    free_game(gs);
+}
+
 int main(void) {
     printf("Tests :\n");
 
@@ -251,6 +283,7 @@ int main(void) {
     printf("unit move... "); test_unit_move(); printf("ok\n");
     printf("game result... "); test_game_result(); printf("ok\n");
     printf("combat city... "); test_combat_city(); printf("ok\n");
+    printf("barbarians... "); test_barbarians(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
