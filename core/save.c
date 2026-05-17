@@ -176,7 +176,7 @@ GameState *game_load(const char *path) {
     CHECK(2, fscanf(f, "MAP %d %d\n", &W, &H));
     gs->map.width = W;
     gs->map.height = H;
-    gs->map.tiles = malloc(H * sizeof(Tile *));
+    gs->map.tiles = calloc(H, sizeof(Tile *));
     if (!gs->map.tiles) goto fail;
     for (int y = 0; y < H; y++) {
         gs->map.tiles[y] = malloc(W * sizeof(Tile));
