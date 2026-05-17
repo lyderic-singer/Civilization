@@ -69,6 +69,9 @@ int main(int argc, char **argv) {
             else
                 gs = game_load(path);
         }
+        printf("\n=== Early Civilization ===\n");
+        printf("Seed: 0x%s\n", gs->seed.hex);
+        printf("Carte: %dx%d | Tours max: %d | Camps barbares: %d\n\n", width, height, turns, n_barbs);
         sdl_run(gs);
     } else {
         while (!gs) {
@@ -80,6 +83,9 @@ int main(int argc, char **argv) {
             else
                 gs = game_load(path);
         }
+        printf("\n=== Early Civilization ===\n");
+        printf("Seed: 0x%s\n", gs->seed.hex);
+        printf("Carte: %dx%d | Tours max: %d | Camps barbares: %d\n\n", width, height, turns, n_barbs);
         game_run(gs);
     }
 
