@@ -1,5 +1,6 @@
 #include "cli.h"
 #include "../core/save.h"
+#include <unistd.h>
 
 void cmd_move(GameState *gs, char *args) {
     char *s_id = strtok(args, " "), *s_dx = strtok(NULL, " "), *s_dy = strtok(NULL, " ");
@@ -122,6 +123,21 @@ void game_run(GameState *gs) {
     print_result(gs);
 }
 
+static const int TERRAIN_BG[TERRAIN_COUNT][3] = {
+    [TERRAIN_PLAIN]    = { 144, 200, 100 },
+    [TERRAIN_FOREST]   = {  34, 100,  34 },
+    [TERRAIN_MOUNTAIN] = { 150, 130, 100 },
+    [TERRAIN_WATER]    = {  64, 120, 200 },
+    [TERRAIN_DESERT]   = { 230, 200, 100 },
+    [TERRAIN_TUNDRA]   = { 200, 220, 230 },
+};
+
+static int has_truecolor(void) {
+    if (!isatty(STDOUT_FILENO)) return 0;
+    char *ct = getenv("COLORTERM");
+    return ct && (strcmp(ct, "truecolor") == 0 || strcmp(ct, "24bit") == 0);
+}
+
 char terrain_char(TerrainType t) {
     switch (t) {
         case TERRAIN_PLAIN: return 'P';
@@ -137,6 +153,8 @@ char terrain_char(TerrainType t) {
 void print_map(GameState *gs) {
     int W = gs->map.width;
     int H = gs->map.height;
+    int color = has_truecolor();
+
     printf("   ");
     for (int x = 0; x < W; x++) {
         if (x % 10 == 0) printf("|");
@@ -148,24 +166,32 @@ void print_map(GameState *gs) {
         for (int x = 0; x < W; x++) {
             Unit *pu = unit_at(gs, x, y, UNIT_OWNER_PLAYER);
             Unit *bu = unit_at(gs, x, y, UNIT_OWNER_BARB);
-            int cid  = gs->map.tiles[y][x].city_id;
-            int pid  = gs->map.tiles[y][x].camp_id;
-            char ch;
-            if (pu) {
-                ch = (pu->type == UNIT_TYPE_SETTLER) ? 'S' : 'W';
-            } else if (cid != -1) {
-                ch = 'C';
-            } else if (bu) {
-                ch = 'b';
-            } else if (pid != -1) {
-                int alive = 0;
+            int cid = gs->map.tiles[y][x].city_id;
+            int pid = gs->map.tiles[y][x].camp_id;
+            int alive_camp = 0;
+            if (pid != -1)
                 for (Camp *c = gs->camps; c; c = c->next)
-                    if (c->id == pid && c->alive) { alive = 1; break; }
-                ch = alive ? 'X' : terrain_char(gs->map.tiles[y][x].terrain);
+                    if (c->id == pid && c->alive) { alive_camp = 1; break; }
+
+            if (color) {
+                TerrainType t = gs->map.tiles[y][x].terrain;
+                printf("\033[48;2;%d;%d;%dm", TERRAIN_BG[t][0], TERRAIN_BG[t][1], TERRAIN_BG[t][2]);
+                if (pu && pu->type == UNIT_TYPE_SETTLER) printf("\033[38;2;240;220;50mS");
+                else if (pu) printf("\033[38;2;50;150;240mW");
+                else if (cid != -1) printf("\033[38;2;255;255;255mC");
+                else if (bu) printf("\033[38;2;200;40;40mb");
+                else if (alive_camp) printf("\033[38;2;220;120;30mX");
+                else printf(" ");
+                printf("\033[0m");
             } else {
-                ch = terrain_char(gs->map.tiles[y][x].terrain);
+                char ch;
+                if (pu) ch = (pu->type == UNIT_TYPE_SETTLER) ? 'S' : 'W';
+                else if (cid != -1) ch = 'C';
+                else if (bu) ch = 'b';
+                else if (alive_camp) ch = 'X';
+                else ch = terrain_char(gs->map.tiles[y][x].terrain);
+                putchar(ch);
             }
-            putchar(ch);
         }
         printf("\n");
     }
