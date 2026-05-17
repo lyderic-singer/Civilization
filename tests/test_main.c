@@ -125,6 +125,24 @@ static void test_production(void) {
     free_game(gs);
 }
 
+static void test_tech(void) {
+    Seed s = gen_seed("79845611960");
+    GameState *gs = gen_game(20, 20, 100, 0, s);
+
+    ASSERT(tech_available(&gs->tech, TECH_ID_HUNTING) == 1);
+    ASSERT(tech_available(&gs->tech, TECH_ID_FARMING) == 1);
+
+    ASSERT(tech_available(&gs->tech, TECH_ID_IRRIGATION) == 0);
+
+    gs->tech.acquired[TECH_ID_FARMING] = 1;
+    ASSERT(tech_available(&gs->tech, TECH_ID_IRRIGATION) == 1);
+
+    gs->tech.acquired[TECH_ID_HUNTING] = 1;
+    ASSERT(tech_available(&gs->tech, TECH_ID_HUNTING) == 0);
+
+    free_game(gs);
+}
+
 int main(void) {
     printf("Tests :\n");
 
@@ -134,6 +152,7 @@ int main(void) {
     printf("city growth... "); test_city_growth(); printf("ok\n");
     printf("city famine... "); test_city_famine(); printf("ok\n");
     printf("production... "); test_production(); printf("ok\n");
+    printf("tech... "); test_tech(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
