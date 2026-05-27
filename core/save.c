@@ -34,7 +34,9 @@ void scores_append(GameState *gs) {
     char date[16];
     strftime(date, sizeof(date), "%Y-%m-%d", t);
 
-    fprintf(f, "%s %s %d tour:%d seed:%s\n",
+    const char *pname = gs->player_name[0] ? gs->player_name : "Joueur";
+    fprintf(f, "%s %s %s %d tour:%d seed:%s\n",
+            pname,
             date,
             result_str(gs->result),
             game_compute_score(gs),
@@ -56,6 +58,7 @@ void game_save(GameState *gs) {
     FILE *f = fopen(final_path, "w");
     if (!f) return;
 
+    fprintf(f, "version %d\n", SAVE_VERSION);
     fprintf(f, "turn %d\n", gs->turn);
     fprintf(f, "turn_max %d\n", gs->turn_max);
     fprintf(f, "gold %d\n", gs->gold);
@@ -69,6 +72,7 @@ void game_save(GameState *gs) {
     fprintf(f, "next_camp_id %d\n", gs->next_camp_id);
     fprintf(f, "seed_hex %s\n", gs->seed.hex);
     fprintf(f, "result %d\n", (int)gs->result);
+    fprintf(f, "player_name %s\n", gs->player_name[0] ? gs->player_name : "Joueur");
 
     fprintf(f, "MAP %d %d\n", gs->map.width, gs->map.height);
     for (int y = 0; y < gs->map.height; y++) {
@@ -122,6 +126,10 @@ int saves_list(char paths[][256], int max) {
     return n;
 }
 
+static int cmp_score(const void *a, const void *b) {
+    return ((ScoreEntry *)b)->score - ((ScoreEntry *)a)->score;
+}
+
 int scores_read(ScoreEntry *entries, int max) {
     FILE *f = fopen(SCORES_FILE, "r");
     if (!f) return 0;
@@ -129,12 +137,13 @@ int scores_read(ScoreEntry *entries, int max) {
     char line[128];
     while (n < max && fgets(line, sizeof(line), f)) {
         line[strcspn(line, "\n")] = '\0';
-        if (sscanf(line, "%31s %31s %d tour:%d",
-                   entries[n].date, entries[n].result,
-                   &entries[n].score, &entries[n].tour) == 4)
+        if (sscanf(line, "%31s %31s %31s %d tour:%d",
+                   entries[n].name, entries[n].date, entries[n].result,
+                   &entries[n].score, &entries[n].tour) == 5)
             n++;
     }
     fclose(f);
+    qsort(entries, n, sizeof(ScoreEntry), cmp_score);
     return n;
 }
 
@@ -156,6 +165,8 @@ GameState *game_load(const char *path) {
     GameState *gs = calloc(1, sizeof(GameState));
     if (!gs) { fclose(f); return NULL; }
 
+    int version = 0;
+    if (fscanf(f, "version %d\n", &version) != 1 || version != SAVE_VERSION) goto fail;
     char seed_hex[SEED_HEX_LEN + 1];
     CHECK(1, fscanf(f, "turn %d\n", &gs->turn));
     CHECK(1, fscanf(f, "turn_max %d\n", &gs->turn_max));
@@ -170,6 +181,7 @@ GameState *game_load(const char *path) {
     CHECK(1, fscanf(f, "next_camp_id %d\n", &gs->next_camp_id));
     CHECK(1, fscanf(f, "seed_hex %16s\n", seed_hex));
     CHECK(1, fscanf(f, "result %d\n", (int *)&gs->result));
+    fscanf(f, "player_name %31s\n", gs->player_name);
     gs->seed = gen_seed(seed_hex);
 
     int W, H;
