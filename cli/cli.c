@@ -2,7 +2,7 @@
 #include "../core/save.h"
 #include <unistd.h>
 
-int cli_choose_start(char *out_path) {
+int cli_choose_start(char *out_path, char *out_name) {
     char saves[32][256];
     ScoreEntry scores[64];
 
@@ -19,7 +19,14 @@ int cli_choose_start(char *out_path) {
         if (!fgets(line, sizeof(line), stdin)) return -1;
         int choice = atoi(line);
 
-        if (choice == 1) return 0;
+        if (choice == 1) {
+            printf("Nom du joueur: ");
+            fflush(stdout);
+            if (!fgets(out_name, 32, stdin)) out_name[0] = '\0';
+            out_name[strcspn(out_name, "\n")] = '\0';
+            if (out_name[0] == '\0') snprintf(out_name, 32, "Joueur");
+            return 0;
+        }
         if (choice == 4) return -1;
 
         if (choice == 2) {
@@ -44,10 +51,10 @@ int cli_choose_start(char *out_path) {
             int n = scores_read(scores, 64);
             printf("\n--- Tableau des scores ---\n");
             if (n == 0) { printf("Aucune partie terminee.\n"); continue; }
-            printf("  %-12s %-18s %-8s Tour\n", "Date", "Resultat", "Score");
+            printf("  %-12s %-12s %-18s %-8s Tour\n", "Joueur", "Date", "Resultat", "Score");
             for (int i = 0; i < n; i++)
-                printf("  %-12s %-18s %-8d %d\n",
-                       scores[i].date, scores[i].result, scores[i].score, scores[i].tour);
+                printf("  %-12s %-12s %-18s %-8d %d\n",
+                       scores[i].name, scores[i].date, scores[i].result, scores[i].score, scores[i].tour);
         }
     }
 }
@@ -79,19 +86,32 @@ void cmd_col(GameState *gs, char *args) {
 
 void cmd_proj(GameState *gs, char *args) {
     char *s_cid = strtok(args, " "), *s_type = strtok(NULL, " "), *s_pid = strtok(NULL, " ");
-    if (!s_cid || !s_type || !s_pid) {
-        printf("Usage: proj <city_id> <u|b> <id>\n");
-        printf("  u = unite: 0=Colon 1=Guerrier\n");
-        printf("  b = batiment: 1=Grenier 2=Atelier 4=Biblio 8=Marche 16=Caserne 32=Muraille\n");
+    if (!s_cid) {
+        printf("Usage: proj <city_id> <u|b> <id>  (u=unite, b=batiment)\n");
         return;
     }
-    int cid = atoi(s_cid), pid = atoi(s_pid);
+    int cid = atoi(s_cid);
     City *city = city_by_id(gs, cid);
     if (!city) { printf("Ville invalide.\n"); return; }
+    if (!s_type || !s_pid) {
+        printf("Projets disponibles pour ville #%d :\n", cid);
+        if (city_can_produce_unit(gs, city, UNIT_TYPE_SETTLER))
+            printf("  proj %d u 0  Colon\n", cid);
+        if (city_can_produce_unit(gs, city, UNIT_TYPE_WARRIOR))
+            printf("  proj %d u 1  Guerrier\n", cid);
+        int bids[] = { BUILDING_GRANARY, BUILDING_WORKSHOP, BUILDING_LIBRARY,
+                       BUILDING_MARKET, BUILDING_BARRACKS, BUILDING_WALL };
+        for (int i = 0; i < 6; i++)
+            if (city_can_build(gs, city, bids[i]))
+                printf("  proj %d b %-2d %s\n", cid, bids[i], building_name(bids[i]));
+        return;
+    }
+    int pid = atoi(s_pid);
     if (s_type[0] == 'u') {
+        if (pid < 0 || pid > UNIT_TYPE_WARRIOR) { printf("Type d'unite invalide.\n"); return; }
         UnitType ut = (UnitType)pid;
-        if (ut == UNIT_TYPE_WARRIOR && !gs->warrior_unlocked) {
-            printf("Artisanat requis pour produire un Guerrier.\n"); return;
+        if (!city_can_produce_unit(gs, city, ut)) {
+            printf("Unite non disponible (tech ou Caserne manquante).\n"); return;
         }
         city_set_project(city, PROJECT_UNIT, pid);
         printf("[Ville %d] Projet: %s\n", cid, unit_type_name(ut));
@@ -272,6 +292,21 @@ void print_map(GameState *gs) {
         printf("\nLegende: P=Plaine F=Foret M=Montagne ~=Eau D=Desert T=Toundra\n");
         printf("         C=Ville S=Colon W=Guerrier b=Barbare X=Camp barbare\n\n");
     }
+    int found = 0;
+    for (int y = 0; y < H; y++) {
+        for (int x = 0; x < W; x++) {
+            Unit *pu = unit_at(gs, x, y, UNIT_OWNER_PLAYER);
+            int cid = gs->map.tiles[y][x].city_id;
+            if (pu && cid != -1) {
+                if (!found) { printf("Superpositions :\n"); found = 1; }
+                printf("  (%d,%d) : Ville #%d + %s #%d\n",
+                       x, y, cid,
+                       pu->type == UNIT_TYPE_SETTLER ? "Colon" : "Warrior",
+                       pu->id);
+            }
+        }
+    }
+    if (found) printf("\n");
 }
 
 void print_status(GameState *gs) {
@@ -327,35 +362,44 @@ void print_tech(GameState *gs) {
     printf("=== Technologies ===\n");
     for (int i = 0; i < TECH_COUNT; i++) {
         const TechDef *d = tech_def(i);
-        char buf[32];
-        const char *status;
-        if (gs->tech.acquired[i]) status = "[OK]";
-        else if (gs->tech.researching == i) {
-            snprintf(buf, sizeof buf, "[%d/%d]", gs->tech.science_stored, d->cost);
-            status = buf;
+        char status[16];
+        if (gs->tech.acquired[i])
+            snprintf(status, sizeof status, "[OK]");
+        else if (gs->tech.researching == i)
+            snprintf(status, sizeof status, "[%d/%d]", gs->tech.science_stored, d->cost);
+        else if (tech_available(&gs->tech, i))
+            snprintf(status, sizeof status, "[dispo]");
+        else
+            snprintf(status, sizeof status, "[verr.]");
+        printf("  %d. %-15s %-12s %3d sci", i, d->name, status, d->cost);
+        if (d->prereq_count > 0) {
+            printf("  req:");
+            for (int j = 0; j < d->prereq_count; j++)
+                printf(" %s", tech_name(d->prereqs[j]));
         }
-        else if (tech_available(&gs->tech, i)) status = "[dispo]";
-        else status = "[verr.]";
-        printf("  %d. %-15s %s  (cout:%d)\n", i, d->name, status, d->cost);
+        printf("\n");
     }
 }
 
 void print_help(void) {
     printf("\n=== Commandes ===\n");
-    printf("  m           Afficher la carte\n");
-    printf("  s           Afficher le statut\n");
-    printf("  u           Lister les unites\n");
-    printf("  c           Lister les villes\n");
-    printf("  t           Arbre technologique\n");
-    printf("  move <id> <dx> <dy>   Deplacer une unite\n");
-    printf("  goto <id> <x> <y>    Deplacer une unite vers (x,y) (greedy)\n");
-    printf("  col <id>             Coloniser (settler uniquement)\n");
-    printf("  proj <city_id> <type> <id>   Definir projet (type: u=unite b=batiment)\n");
-    printf("  research <tech_id>   Lancer recherche\n");
-    printf("  save                 Sauvegarder la partie\n");
-    printf("  end                  Passer au tour suivant\n");
-    printf("  help                 Afficher cette aide\n");
-    printf("  quit                 Quitter\n\n");
+    printf("  %-30s %s\n", "m",                        "Afficher la carte");
+    printf("  %-30s %s\n", "s",                        "Afficher le statut");
+    printf("  %-30s %s\n", "u",                        "Lister les unites");
+    printf("  %-30s %s\n", "c",                        "Lister les villes");
+    printf("  %-30s %s\n", "t",                        "Afficher l'arbre technologique");
+    printf("  %-30s %s\n", "move <id> <dx> <dy>",      "Deplacer une unite (relatif)");
+    printf("  %-30s %s\n", "goto <id> <x> <y>",        "Deplacer une unite vers (x,y)");
+    printf("  %-30s %s\n", "col <id>",                 "Coloniser avec un settler");
+    printf("  %-30s %s\n", "proj <city_id>",            "Lister les projets disponibles");
+    printf("  %-30s %s\n", "proj <city_id> <u|b> <id>","Definir le projet (u=unite b=batiment)");
+    printf("  %-30s %s\n", "research",                 "Afficher les technologies");
+    printf("  %-30s %s\n", "research <tech_id>",       "Lancer une recherche");
+    printf("  %-30s %s\n", "save",                     "Sauvegarder la partie");
+    printf("  %-30s %s\n", "end",                      "Passer au tour suivant");
+    printf("  %-30s %s\n", "help",                     "Afficher cette aide");
+    printf("  %-30s %s\n", "quit",                     "Quitter");
+    printf("\n");
 }
 
 void print_result(GameState *gs) {
