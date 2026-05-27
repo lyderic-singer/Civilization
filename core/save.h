@@ -5,8 +5,10 @@
 
 #define SCORES_FILE "scores.txt"
 #define SAVES_DIR "saves"
+#define SAVE_VERSION 1
 
 typedef struct {
+    char name[32];
     char date[32];
     char result[32];
     int score;

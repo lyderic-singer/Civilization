@@ -180,6 +180,7 @@ typedef struct {
     int        wall_unlocked;
     int        library_unlocked;
     int        market_unlocked;
+    char       player_name[32];
 } GameState;
 
 #endif
