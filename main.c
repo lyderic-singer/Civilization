@@ -62,12 +62,15 @@ int main(int argc, char **argv) {
     if (mode_sdl) {
         while (!gs) {
             char path[256] = "";
-            int choice = sdl_choose_start(path);
+            char player_name[32] = "";
+            int choice = sdl_choose_start(path, player_name);
             if (choice == -1) return 0;
-            if (choice == 0)
+            if (choice == 0) {
                 gs = gen_game(width, height, turns, n_barbs, seed);
-            else
+                if (gs) snprintf(gs->player_name, sizeof(gs->player_name), "%s", player_name);
+            } else {
                 gs = game_load(path);
+            }
         }
         printf("\n=== Early Civilization ===\n");
         printf("Seed: 0x%s\n", gs->seed.hex);
@@ -76,12 +79,15 @@ int main(int argc, char **argv) {
     } else {
         while (!gs) {
             char path[256] = "";
-            int choice = cli_choose_start(path);
+            char player_name[32] = "";
+            int choice = cli_choose_start(path, player_name);
             if (choice == -1) return 0;
-            if (choice == 0)
+            if (choice == 0) {
                 gs = gen_game(width, height, turns, n_barbs, seed);
-            else
+                if (gs) snprintf(gs->player_name, sizeof(gs->player_name), "%s", player_name);
+            } else {
                 gs = game_load(path);
+            }
         }
         printf("\n=== Early Civilization ===\n");
         printf("Seed: 0x%s\n", gs->seed.hex);
