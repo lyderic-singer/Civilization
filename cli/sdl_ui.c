@@ -8,7 +8,7 @@
 
 typedef struct { uint8_t r, g, b; } Color;
 typedef struct { int x, y; } Camera;
-typedef enum { MENU_NONE, MENU_CITY, MENU_TECH } MenuState;
+typedef enum { MENU_NONE, MENU_CITY, MENU_TECH, MENU_TILE } MenuState;
 
 typedef struct { int type; int id; const char *label; } MenuItem;
 
@@ -110,7 +110,7 @@ static void draw_selection(SDL_Renderer *r, int tx, int ty, Camera cam) {
 
 static void handle_click(GameState *gs, int px, int py, int *selected_id, Camera cam,
                          char *status_msg, MenuState *menu, City **menu_city,
-                         int *info_id, char *info_text) {
+                         int *menu_unit_id, int *info_id, char *info_text) {
     status_msg[0] = '\0';
     *menu = MENU_NONE;
     *info_id = -1;
@@ -123,6 +123,14 @@ static void handle_click(GameState *gs, int px, int py, int *selected_id, Camera
 
     for (City *c = gs->cities; c; c = c->next) {
         if (c->x == tx && c->y == ty) {
+            Unit *pu = unit_at(gs, tx, ty, UNIT_OWNER_PLAYER);
+            if (pu) {
+                *menu = MENU_TILE;
+                *menu_city = c;
+                *menu_unit_id = pu->id;
+                *selected_id = -1;
+                return;
+            }
             *menu = MENU_CITY;
             *menu_city = c;
             *selected_id = -1;
@@ -307,6 +315,39 @@ static void draw_menu_tech(SDL_Renderer *r, TTF_Font *font, int cursor, GameStat
     }
 }
 
+static void draw_menu_tile(SDL_Renderer *r, TTF_Font *font, int cursor,
+                           int unit_id, GameState *gs) {
+    char buf[64];
+    Unit *u = unit_by_id(gs, unit_id);
+    snprintf(buf, sizeof(buf), "Selectionner %s", u ? unit_type_name(u->type) : "unite");
+
+    int w0 = text_width(font, "Que faire ?");
+    int w1 = text_width(font, "Gerer la ville");
+    int w2 = text_width(font, buf);
+    int w = w0;
+    if (w1 > w) w = w1;
+    if (w2 > w) w = w2;
+    w += 2 * PANEL_PAD;
+
+    int h = PANEL_PAD + LINE_H + 2 * LINE_H + PANEL_PAD;
+    int mx = (SCREEN_W - w) / 2;
+    int my = (SCREEN_H - h) / 2;
+
+    SDL_Rect bg = { mx, my, w, h };
+    SDL_SetRenderDrawColor(r, COL_MENU_BG.r, COL_MENU_BG.g, COL_MENU_BG.b, COL_MENU_BG.a);
+    SDL_RenderFillRect(r, &bg);
+    SDL_SetRenderDrawColor(r, COL_MENU_BORDER.r, COL_MENU_BORDER.g, COL_MENU_BORDER.b, COL_MENU_BORDER.a);
+    SDL_RenderDrawRect(r, &bg);
+
+    draw_text(r, font, "Que faire ?", mx + PANEL_PAD, my + PANEL_PAD, COL_GRAY);
+
+    SDL_Color col0 = (cursor == 0) ? COL_WHITE : COL_YELLOW;
+    draw_text(r, font, "Gerer la ville", mx + PANEL_PAD, my + PANEL_PAD + LINE_H, col0);
+
+    SDL_Color col1 = (cursor == 1) ? COL_WHITE : COL_YELLOW;
+    draw_text(r, font, buf, mx + PANEL_PAD, my + PANEL_PAD + 2 * LINE_H, col1);
+}
+
 static void draw_panel(SDL_Renderer *r, TTF_Font *font,
                        GameState *gs, int selected_id, int info_id,
                        const char *info_text, const char *status_msg, SDL_Color status_col,
@@ -447,7 +488,7 @@ static void draw_entities(SDL_Renderer *r, GameState *gs, Camera cam) {
     }
 }
 
-int sdl_choose_start(char *out_path) {
+int sdl_choose_start(char *out_path, char *out_name) {
     char saves[32][256];
     int n_saves = saves_list(saves, 32);
 
@@ -504,28 +545,48 @@ int sdl_choose_start(char *out_path) {
     Screen screen = SCREEN_MENU;
     int cursor = 0;
     int choice = -1;
+    int asking_name = 0;
+    char name_buf[32] = "";
 
     while (choice == -1) {
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) { choice = -2; break; }
+            if (e.type == SDL_TEXTINPUT && asking_name) {
+                int len = strlen(name_buf);
+                int add = strlen(e.text.text);
+                if (len + add < 31) strcat(name_buf, e.text.text);
+            }
             if (e.type == SDL_KEYDOWN) {
                 switch (e.key.keysym.sym) {
                     case SDLK_ESCAPE:
-                        if (screen != SCREEN_MENU) { screen = SCREEN_MENU; cursor = 0; }
+                        if (asking_name) { SDL_StopTextInput(); asking_name = 0; }
+                        else if (screen != SCREEN_MENU) { screen = SCREEN_MENU; cursor = 0; }
                         else choice = -2;
                         break;
+                    case SDLK_BACKSPACE:
+                        if (asking_name) {
+                            int len = strlen(name_buf);
+                            if (len > 0) name_buf[len - 1] = '\0';
+                        }
+                        break;
                     case SDLK_UP:
-                        if (screen == SCREEN_MENU) cursor = (cursor - 1 + 3) % 3;
-                        else if (screen == SCREEN_SAVES && n_saves > 0) cursor = (cursor - 1 + n_saves) % n_saves;
+                        if (!asking_name && screen == SCREEN_MENU) cursor = (cursor - 1 + 3) % 3;
+                        else if (!asking_name && screen == SCREEN_SAVES && n_saves > 0) cursor = (cursor - 1 + n_saves) % n_saves;
                         break;
                     case SDLK_DOWN:
-                        if (screen == SCREEN_MENU) cursor = (cursor + 1) % 3;
-                        else if (screen == SCREEN_SAVES && n_saves > 0) cursor = (cursor + 1) % n_saves;
+                        if (!asking_name && screen == SCREEN_MENU) cursor = (cursor + 1) % 3;
+                        else if (!asking_name && screen == SCREEN_SAVES && n_saves > 0) cursor = (cursor + 1) % n_saves;
                         break;
                     case SDLK_RETURN:
-                        if (screen == SCREEN_MENU) {
-                            if (cursor == 0) choice = 0;
+                        if (asking_name) {
+                            SDL_StopTextInput();
+                            if (name_buf[0] == '\0') snprintf(name_buf, sizeof(name_buf), "Joueur");
+                            snprintf(out_name, 32, "%s", name_buf);
+                            asking_name = 0;
+                            choice = 0;
+                        } else if (screen == SCREEN_MENU) {
+                            if (cursor == 0) { name_buf[0] = '\0'; SDL_StartTextInput(); asking_name = 1; }
                             else if (cursor == 1) { screen = SCREEN_SAVES; cursor = 0; }
                             else { screen = SCREEN_SCORES; cursor = 0; }
                         } else if (screen == SCREEN_SAVES && n_saves > 0) {
@@ -552,8 +613,16 @@ int sdl_choose_start(char *out_path) {
                 draw_text(renderer, font, options[i], cx - text_width(font, options[i]) / 2,
                           cy + i * LINE_H * 2, col);
             }
-            const char *hint = "[Haut/Bas=naviguer]  [Entree=choisir]  [Echap=quitter]";
-            draw_text(renderer, font, hint, cx - text_width(font, hint) / 2, cy + LINE_H * 5, COL_GRAY);
+            if (asking_name) {
+                const char *prompt = "Entrez votre nom :";
+                draw_text(renderer, font, prompt, cx - text_width(font, prompt) / 2, cy + LINE_H * 4, COL_GRAY);
+                char display[36];
+                snprintf(display, sizeof(display), "%s_", name_buf);
+                draw_text(renderer, font, display, cx - text_width(font, display) / 2, cy + LINE_H * 5, COL_WHITE);
+            } else {
+                const char *hint = "[Haut/Bas=naviguer]  [Entree=choisir]  [Echap=quitter]";
+                draw_text(renderer, font, hint, cx - text_width(font, hint) / 2, cy + LINE_H * 5, COL_GRAY);
+            }
         } else if (screen == SCREEN_SAVES) {
             const char *title = "Choisir une sauvegarde";
             draw_text(renderer, font, title, cx - text_width(font, title) / 2, cy - LINE_H * 4, COL_WHITE);
@@ -580,25 +649,28 @@ int sdl_choose_start(char *out_path) {
                 draw_text(renderer, font, msg, cx - text_width(font, msg) / 2, cy, COL_GRAY);
             } else {
                 int pad = SCREEN_W / 12;
-                int col_w = SCREEN_W / 4;
+                int col_w = (SCREEN_W - 2 * pad) / 5;
                 int c0 = pad;
                 int c1 = pad + col_w;
                 int c2 = pad + col_w * 2;
                 int c3 = pad + col_w * 3;
+                int c4 = pad + col_w * 4;
                 int y0 = cy - LINE_H * 3;
-                draw_text(renderer, font, "Date", c0, y0, COL_GRAY);
-                draw_text(renderer, font, "Resultat", c1, y0, COL_GRAY);
-                draw_text(renderer, font, "Score", c2, y0, COL_GRAY);
-                draw_text(renderer, font, "Tour", c3, y0, COL_GRAY);
+                draw_text(renderer, font, "Joueur", c0, y0, COL_GRAY);
+                draw_text(renderer, font, "Date", c1, y0, COL_GRAY);
+                draw_text(renderer, font, "Resultat", c2, y0, COL_GRAY);
+                draw_text(renderer, font, "Score", c3, y0, COL_GRAY);
+                draw_text(renderer, font, "Tour", c4, y0, COL_GRAY);
                 for (int i = 0; i < n_scores; i++) {
                     char sbuf[16], tbuf[16];
                     snprintf(sbuf, sizeof(sbuf), "%d", scores[i].score);
                     snprintf(tbuf, sizeof(tbuf), "%d", scores[i].tour);
                     int y = y0 + (i + 1) * LINE_H;
-                    draw_text(renderer, font, scores[i].date,   c0, y, COL_WHITE);
-                    draw_text(renderer, font, scores[i].result, c1, y, COL_YELLOW);
-                    draw_text(renderer, font, sbuf,             c2, y, COL_CYAN);
-                    draw_text(renderer, font, tbuf,             c3, y, COL_WHITE);
+                    draw_text(renderer, font, scores[i].name, c0, y, COL_WHITE);
+                    draw_text(renderer, font, scores[i].date, c1, y, COL_WHITE);
+                    draw_text(renderer, font, scores[i].result, c2, y, COL_YELLOW);
+                    draw_text(renderer, font, sbuf, c3, y, COL_CYAN);
+                    draw_text(renderer, font, tbuf, c4, y, COL_WHITE);
                 }
             }
             const char *hint = "[Echap=retour]";
@@ -685,6 +757,7 @@ void sdl_run(GameState *gs) {
     MenuState menu = MENU_NONE;
     City *menu_city = NULL;
     int menu_cursor = 0;
+    int menu_unit_id = -1;
 
     while (running && gs->result == RESULT_ONGOING) {
         SDL_Event e;
@@ -701,7 +774,9 @@ void sdl_run(GameState *gs) {
                     case SDLK_LEFT:   if (menu == MENU_NONE) { cam.x--; camera_clamp(&cam, gs); } break;
                     case SDLK_RIGHT:  if (menu == MENU_NONE) { cam.x++; camera_clamp(&cam, gs); } break;
                     case SDLK_UP:
-                        if (menu == MENU_CITY && menu_city) {
+                        if (menu == MENU_TILE) {
+                            menu_cursor = (menu_cursor - 1 + 2) % 2;
+                        } else if (menu == MENU_CITY && menu_city) {
                             int start = menu_cursor;
                             do { menu_cursor = (menu_cursor - 1 + CITY_ITEMS_N) % CITY_ITEMS_N; }
                             while (!city_item_avail(gs, menu_city, menu_cursor) && menu_cursor != start);
@@ -712,7 +787,9 @@ void sdl_run(GameState *gs) {
                         } else { cam.y--; camera_clamp(&cam, gs); }
                         break;
                     case SDLK_DOWN:
-                        if (menu == MENU_CITY && menu_city) {
+                        if (menu == MENU_TILE) {
+                            menu_cursor = (menu_cursor + 1) % 2;
+                        } else if (menu == MENU_CITY && menu_city) {
                             int start = menu_cursor;
                             do { menu_cursor = (menu_cursor + 1) % CITY_ITEMS_N; }
                             while (!city_item_avail(gs, menu_city, menu_cursor) && menu_cursor != start);
@@ -755,6 +832,16 @@ void sdl_run(GameState *gs) {
                         }
                         break;
                     case SDLK_RETURN:
+                        if (menu == MENU_TILE) {
+                            if (menu_cursor == 0) {
+                                menu = MENU_CITY;
+                            } else {
+                                selected_id = menu_unit_id;
+                                menu = MENU_NONE;
+                            }
+                            menu_cursor = 0;
+                            break;
+                        }
                         if (menu == MENU_CITY && menu_city) {
                             if (city_item_avail(gs, menu_city, menu_cursor)) {
                                 city_set_project(menu_city, CITY_ITEMS[menu_cursor].type, CITY_ITEMS[menu_cursor].id);
@@ -797,8 +884,8 @@ void sdl_run(GameState *gs) {
             }
 
             if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT) {
-                handle_click(gs, e.button.x, e.button.y, &selected_id, cam, status_msg, &menu, &menu_city, &info_id, info_text);
-                if (menu == MENU_CITY) menu_cursor = 0;
+                handle_click(gs, e.button.x, e.button.y, &selected_id, cam, status_msg, &menu, &menu_city, &menu_unit_id, &info_id, info_text);
+                if (menu == MENU_CITY || menu == MENU_TILE) menu_cursor = 0;
             }
         }
 
@@ -809,6 +896,7 @@ void sdl_run(GameState *gs) {
         draw_panel(renderer, font, gs, selected_id, info_id, info_text, status_msg, status_col, menu);
         if (menu == MENU_CITY) draw_menu_city(renderer, font, menu_cursor, menu_city, gs);
         if (menu == MENU_TECH) draw_menu_tech(renderer, font, menu_cursor, gs);
+        if (menu == MENU_TILE) draw_menu_tile(renderer, font, menu_cursor, menu_unit_id, gs);
         if (selected_id != -1) {
             Unit *u = unit_by_id(gs, selected_id);
             if (u) draw_selection(renderer, u->x, u->y, cam);
