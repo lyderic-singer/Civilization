@@ -40,4 +40,4 @@ clean:
 	rm -f $(TARGET) $(TEST_BIN)
 
 reset: clean
-	rm -f saves/*.sav scores.txt
+	rm -f saves/*.txt scores.txt
