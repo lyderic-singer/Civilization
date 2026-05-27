@@ -1,6 +1,6 @@
 ## Compte rendu 3
 
-**Date :** 26/04/2026
+**Date :** 26/05/2026
 
 **État :** Version jouable + UI SDL + intégration finalisée
 
@@ -62,6 +62,8 @@ Globalement : **version propre et présentable**
 * Fichier de tests propre (actuellement incomplet / non structuré)
 * README à nettoyer et finaliser
 * README non push pour l’instant
+* EXT-4 Nom + Version
+* Fix bug UI : clic sur case avec warrior et ville dessus, choisir lequel on veut
 
 ---
 
