@@ -1,6 +1,8 @@
 #include "../core/core.h"
 #include "../core/turn.h"
+#include "../core/save.h"
 #include <stdio.h>
+#include <string.h>
 
 static int passes = 0;
 static int failures = 0;
@@ -354,6 +356,52 @@ static void test_territorial_victory(void) {
     free_game(gs);
 }
 
+static void test_save_load(void) {
+    Seed s = gen_seed("498651328764531");
+    GameState *gs = gen_game(20, 20, 100, 1, s);
+
+    gs->gold = 42;
+    gs->turn = 7;
+    gs->tech.acquired[TECH_ID_HUNTING] = 1;
+    unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, 3, 3);
+
+    char paths_before[64][256];
+    int n_before = saves_list(paths_before, 64);
+
+    game_save(gs);
+
+    char paths_after[64][256];
+    int n_after = saves_list(paths_after, 64);
+
+    ASSERT(n_after == n_before + 1);
+
+    char new_path[256] = "";
+    for (int i = 0; i < n_after; i++) {
+        int found = 0;
+        for (int j = 0; j < n_before; j++)
+            if (strcmp(paths_after[i], paths_before[j]) == 0) { found = 1; break; }
+        if (!found) { snprintf(new_path, sizeof(new_path), "%s", paths_after[i]); break; }
+    }
+    ASSERT(new_path[0] != '\0');
+
+    GameState *gs2 = game_load(new_path);
+    ASSERT(gs2 != NULL);
+
+    if (gs2) {
+        ASSERT(gs2->turn == gs->turn);
+        ASSERT(gs2->gold == gs->gold);
+        ASSERT(gs2->turn_max == gs->turn_max);
+        ASSERT(cities_count(gs2) == cities_count(gs));
+        ASSERT(units_count_all(gs2) == units_count_all(gs));
+        for (int i = 0; i < TECH_COUNT; i++)
+            ASSERT(gs2->tech.acquired[i] == gs->tech.acquired[i]);
+        remove(new_path);
+        free_game(gs2);
+    }
+
+    free_game(gs);
+}
+
 static void test_barbarians(void) {
     Seed s = gen_seed("6451164578964312");
     GameState *gs = gen_game(20, 20, 100, 1, s);
@@ -405,6 +453,7 @@ int main(void) {
     printf("unit maintenance... "); test_unit_maintenance(); printf("ok\n");
     printf("building yields... "); test_building_yields(); printf("ok\n");
     printf("territorial victory... "); test_territorial_victory(); printf("ok\n");
+    printf("save/load... "); test_save_load(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
