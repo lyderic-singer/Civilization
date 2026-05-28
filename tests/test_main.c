@@ -424,7 +424,7 @@ static void test_barbarians(void) {
     if (!player)
         player = unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, gs->cities->x, gs->cities->y);
 
-    Unit *barb = unit_create(gs, UNIT_TYPE_BARB, UNIT_OWNER_BARB, gs->cities->x + 1, gs->cities->y);
+    unit_create(gs, UNIT_TYPE_BARB, UNIT_OWNER_BARB, gs->cities->x + 1, gs->cities->y);
     int hp_before = player->hp;
     gs->barb_unit_count++;
 
