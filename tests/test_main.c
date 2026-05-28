@@ -316,6 +316,44 @@ static void test_building_yields(void) {
     free_game(gs);
 }
 
+static void test_territorial_victory(void) {
+    Seed s = gen_seed("48651249861532");
+    GameState *gs = gen_game(30, 30, 100, 0, s);
+
+    for (int i = 0; i < VICTORY_TERRITORIAL_CITIES - 1; i++) {
+        gs->map.tiles[i][0].terrain = TERRAIN_PLAIN;
+        gs->map.tiles[i][0].city_id = -1;
+        gs->map.tiles[i][0].camp_id = -1;
+        city_create(gs, 0, i, gs->turn);
+    }
+
+    ASSERT(cities_count(gs) == VICTORY_TERRITORIAL_CITIES);
+
+    for (int i = 0; i < VICTORY_TERRITORIAL_TURNS - 1; i++) {
+        ASSERT(game_check_result(gs) == RESULT_ONGOING);
+        ASSERT(gs->territorial_consecutive_turns == i + 1);
+    }
+
+    ASSERT(game_check_result(gs) == RESULT_WIN_TERR);
+
+    free_game(gs);
+
+    gs = gen_game(30, 30, 100, 0, s);
+
+    for (int i = 0; i < VICTORY_TERRITORIAL_CITIES - 2; i++) {
+        gs->map.tiles[i][0].terrain = TERRAIN_PLAIN;
+        gs->map.tiles[i][0].city_id = -1;
+        gs->map.tiles[i][0].camp_id = -1;
+        city_create(gs, 0, i, gs->turn);
+    }
+
+    ASSERT(cities_count(gs) == VICTORY_TERRITORIAL_CITIES - 1);
+    game_check_result(gs);
+    ASSERT(gs->territorial_consecutive_turns == 0);
+
+    free_game(gs);
+}
+
 static void test_barbarians(void) {
     Seed s = gen_seed("6451164578964312");
     GameState *gs = gen_game(20, 20, 100, 1, s);
@@ -366,6 +404,7 @@ int main(void) {
     printf("tech yields... "); test_tech_yields(); printf("ok\n");
     printf("unit maintenance... "); test_unit_maintenance(); printf("ok\n");
     printf("building yields... "); test_building_yields(); printf("ok\n");
+    printf("territorial victory... "); test_territorial_victory(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
