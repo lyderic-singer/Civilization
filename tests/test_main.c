@@ -238,6 +238,34 @@ static void test_combat_city(void) {
     free_game(gs);
 }
 
+static void test_tech_yields(void) {
+    Seed s = gen_seed("78465132354666512");
+    GameState *gs = gen_game(20, 20, 100, 0, s);
+    City *c = gs->cities;
+
+    int cx = c->x;
+    int cy = c->y;
+
+    for (int dy = -1; dy <= 1; dy++)
+        for (int dx = -1; dx <= 1; dx++)
+            if (dx || dy)
+                gs->map.tiles[cy + dy][cx + dx].terrain = TERRAIN_PLAIN;
+
+    gs->map.tiles[cy][cx + 1].terrain = TERRAIN_FOREST;
+    gs->map.tiles[cy - 1][cx].terrain = TERRAIN_FOREST;
+
+    cities_compute_yields(gs);
+    int food_before = c->yield_food;
+
+    gs->tech.acquired[TECH_ID_HUNTING] = 1;
+    tech_apply_effects(gs);
+    cities_compute_yields(gs);
+
+    ASSERT(c->yield_food == food_before + 2);
+
+    free_game(gs);
+}
+
 static void test_barbarians(void) {
     Seed s = gen_seed("6451164578964312");
     GameState *gs = gen_game(20, 20, 100, 1, s);
@@ -285,6 +313,7 @@ int main(void) {
     printf("game result... "); test_game_result(); printf("ok\n");
     printf("combat city... "); test_combat_city(); printf("ok\n");
     printf("barbarians... "); test_barbarians(); printf("ok\n");
+    printf("tech yields... "); test_tech_yields(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
