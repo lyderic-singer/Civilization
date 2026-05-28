@@ -303,6 +303,7 @@ Le moteur dans `core/` ne connaît ni SDL ni CLI. Les deux interfaces appellent 
 Le dossier `reports/` contient :
 
 - `report1.md`, `report2.md`, `report3.md` — comptes rendus de réunion
+- `BILAN.md` — bilan de fin de projet
 - `planning.png` — planning du projet et attribution des tâches (diagramme de Gantt)
 - `SPEC_TECHNIQUE.md` — spécification technique : structures de données, algorithmes, choix d'architecture, extension implémentée (EXT-4), simplifications assumées
 
