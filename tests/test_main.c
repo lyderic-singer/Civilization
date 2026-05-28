@@ -266,6 +266,31 @@ static void test_tech_yields(void) {
     free_game(gs);
 }
 
+static void test_unit_maintenance(void) {
+    Seed s = gen_seed("846513284651324865");
+    GameState *gs = gen_game(20, 20, 100, 0, s);
+
+    gs->gold = 100;
+    for (City *c = gs->cities; c; c = c->next)
+        c->yield_gold = 0;
+
+    int base_maint = 0;
+    for (Unit *u = gs->units; u; u = u->next)
+        if (u->owner == UNIT_OWNER_PLAYER) base_maint += u->maint;
+
+    int gold_before = gs->gold;
+    Unit *w = unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, 5, 5);
+    apply_gold_phase(gs);
+    ASSERT(gs->gold == gold_before - base_maint - w->maint);
+
+    gold_before = gs->gold;
+    Unit *w2 = unit_create(gs, UNIT_TYPE_WARRIOR, UNIT_OWNER_PLAYER, 6, 5);
+    apply_gold_phase(gs);
+    ASSERT(gs->gold == gold_before - base_maint - w->maint - w2->maint);
+
+    free_game(gs);
+}
+
 static void test_barbarians(void) {
     Seed s = gen_seed("6451164578964312");
     GameState *gs = gen_game(20, 20, 100, 1, s);
@@ -314,6 +339,7 @@ int main(void) {
     printf("combat city... "); test_combat_city(); printf("ok\n");
     printf("barbarians... "); test_barbarians(); printf("ok\n");
     printf("tech yields... "); test_tech_yields(); printf("ok\n");
+    printf("unit maintenance... "); test_unit_maintenance(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
