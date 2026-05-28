@@ -291,6 +291,31 @@ static void test_unit_maintenance(void) {
     free_game(gs);
 }
 
+static void test_building_yields(void) {
+    Seed s = gen_seed("4865123854312498");
+    GameState *gs = gen_game(20, 20, 100, 0, s);
+    City *c = gs->cities;
+
+    cities_compute_yields(gs);
+    int food_before = c->yield_food;
+    int prod_before = c->yield_prod;
+    int sci_before  = c->yield_science;
+    int gold_before = c->yield_gold;
+
+    c->buildings |= BUILDING_GRANARY;
+    c->buildings |= BUILDING_WORKSHOP;
+    c->buildings |= BUILDING_LIBRARY;
+    c->buildings |= BUILDING_MARKET;
+    cities_compute_yields(gs);
+
+    ASSERT(c->yield_food == food_before + BUILDING_GRANARY_FOOD);
+    ASSERT(c->yield_prod == prod_before + BUILDING_WORKSHOP_PROD);
+    ASSERT(c->yield_science == sci_before + BUILDING_LIBRARY_SCI);
+    ASSERT(c->yield_gold == gold_before + BUILDING_MARKET_GOLD);
+
+    free_game(gs);
+}
+
 static void test_barbarians(void) {
     Seed s = gen_seed("6451164578964312");
     GameState *gs = gen_game(20, 20, 100, 1, s);
@@ -340,6 +365,7 @@ int main(void) {
     printf("barbarians... "); test_barbarians(); printf("ok\n");
     printf("tech yields... "); test_tech_yields(); printf("ok\n");
     printf("unit maintenance... "); test_unit_maintenance(); printf("ok\n");
+    printf("building yields... "); test_building_yields(); printf("ok\n");
 
     printf("\n%d passed, %d failed\n", passes, failures);
     return failures > 0 ? 1 : 0;
