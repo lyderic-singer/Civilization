@@ -431,7 +431,7 @@ degats_en_retour    = max(0, attaque_defenseur − defense_attaquant)
 
 Une unité à 0 PV est détruite immédiatement.
 
-Pour une attaque de ville, la ville utilise une valeur fixe (20, ou 30 avec le Rempart) à la fois en attaque et en défense. Si elle tombe à 0 PV, elle est rasée. Un campement barbare ne se défend pas.
+Pour une attaque de ville, la ville utilise une valeur fixe (20, ou 30 avec la Muraille) à la fois en attaque et en défense. Si elle tombe à 0 PV, elle est rasée. Un campement barbare ne se défend pas.
 
 ---
 

@@ -198,7 +198,7 @@ Les villes construisent des bâtiments ou des unités. Si l'or passe en négatif
 | Bibliothèque | 50 | 1 | +4 science | Écriture |
 | Marché | 40 | 1 | +3 or | Commerce |
 | Caserne | 60 | 2 | permet de recruter des Warriors | — |
-| Rempart | 80 | 2 | défense de ville à 30 au lieu de 20 | Maçonnerie |
+| Muraille | 80 | 2 | défense de ville à 30 au lieu de 20 | Maçonnerie |
 
 ### Technologies
 
@@ -208,7 +208,7 @@ Les villes construisent des bâtiments ou des unités. Si l'or passe en négatif
 | 1 | Agriculture | 60 | aucun | +10% nourriture |
 | 2 | Irrigation | 90 | Agriculture | +20% nourriture en plus |
 | 3 | Artisanat | 70 | aucun | +10% production, débloque Warrior |
-| 4 | Maçonnerie | 100 | Artisanat | débloque Rempart |
+| 4 | Maçonnerie | 100 | Artisanat | débloque Muraille |
 | 5 | Écriture | 80 | aucun | +10% science, débloque Bibliothèque |
 | 6 | Commerce | 90 | Artisanat + Écriture | +10% or, débloque Marché |
 | 7 | Équitation | 100 | aucun | +1 PM à toutes les unités |
